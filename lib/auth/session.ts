@@ -6,7 +6,10 @@ const SESSION_COOKIE_NAME = "superior_admin_session";
 const DEFAULT_SECRET = "superior-showcase-jwt-secret-key-32-chars-long-secure";
 
 function getSecretKey(): Uint8Array {
-  const secret = process.env.SESSION_SECRET || DEFAULT_SECRET;
+  let secret = (process.env.SESSION_SECRET || DEFAULT_SECRET).trim();
+  if ((secret.startsWith('"') && secret.endsWith('"')) || (secret.startsWith("'") && secret.endsWith("'"))) {
+    secret = secret.slice(1, -1);
+  }
   return new TextEncoder().encode(secret);
 }
 

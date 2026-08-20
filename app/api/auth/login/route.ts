@@ -28,7 +28,11 @@ export async function POST(request: NextRequest) {
 
     const isMatch = await verifyAdminPassword(password);
     if (!isMatch) {
-      await dataAdapter.logAdminAction("LOGIN_FAILED", "SECURITY", ip, "Failed password attempt");
+      try {
+        await dataAdapter.logAdminAction("LOGIN_FAILED", "SECURITY", ip, "Failed password attempt");
+      } catch (logErr) {
+        console.warn("[AdminLogin] Log failed attempt error:", logErr);
+      }
       return NextResponse.json(
         { error: "Invalid super-admin credentials" },
         { status: 401 }
@@ -40,11 +44,24 @@ export async function POST(request: NextRequest) {
     const token = await createAdminSessionToken();
     await setAdminSessionCookie(token);
 
-    await dataAdapter.logAdminAction("LOGIN_SUCCESS", "ADMIN", "SESSION", `Admin authenticated from IP ${ip}`);
+    try {
+      await dataAdapter.logAdminAction("LOGIN_SUCCESS", "ADMIN", "SESSION", `Admin authenticated from IP ${ip}`);
+    } catch (logErr) {
+      console.warn("[AdminLogin] Log success error:", logErr);
+    }
 
-    return NextResponse.json({ success: true, message: "Authentication successful" });
-  } catch (error) {
-    console.error("[AdminLogin] Error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const response = NextResponse.json({ success: true, message: "Authentication successful" });
+    response.cookies.set("superior_admin_session", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    return response;
+  } catch (error: any) {
+    console.error("[AdminLogin] Error:", error?.message || error);
+    return NextResponse.json({ error: error?.message || "Internal server error" }, { status: 500 });
   }
 }

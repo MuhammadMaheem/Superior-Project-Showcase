@@ -13,7 +13,15 @@ import type {
   AdminAuditLog,
 } from "./models";
 
-const DB_FILE_PATH = path.join(process.cwd(), ".data", "showcase_db.json");
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.NODE_ENV === "production"
+);
+
+const DB_FILE_PATH = IS_SERVERLESS
+  ? path.join("/tmp", "showcase_db.json")
+  : path.join(process.cwd(), ".data", "showcase_db.json");
 
 interface LocalDatabase {
   projects: Project[];
@@ -25,68 +33,81 @@ interface LocalDatabase {
   audit_logs: AdminAuditLog[];
 }
 
-// Ensure .data folder exists for local persistence
-function ensureLocalDb(): LocalDatabase {
-  const dir = path.dirname(DB_FILE_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+let memoryDb: LocalDatabase | null = null;
 
-  if (!fs.existsSync(DB_FILE_PATH)) {
-    const initialDb: LocalDatabase = {
-      projects: getInitialSeedProjects(),
-      teachers: getInitialSeedTeachers(),
-      teachers_pending: [],
-      sync_meta: {
-        last_hash: "initial_seeded_hash_2026",
-        last_synced_at: new Date().toISOString(),
-        last_check_status: "ok",
+function createDefaultDb(): LocalDatabase {
+  return {
+    projects: getInitialSeedProjects(),
+    teachers: getInitialSeedTeachers(),
+    teachers_pending: [],
+    sync_meta: {
+      last_hash: "initial_seeded_hash_2026",
+      last_synced_at: new Date().toISOString(),
+      last_check_status: "ok",
+    },
+    sync_logs: [],
+    queries: getInitialSeedQueries(),
+    audit_logs: [
+      {
+        id: "log-init",
+        timestamp: new Date().toISOString(),
+        action: "SYSTEM_INITIALIZED",
+        target_type: "SYSTEM",
+        target_id: "ALL",
+        details: "Superior Project Showcase platform initialized with faculty seed.",
       },
-      sync_logs: [],
-      queries: getInitialSeedQueries(),
-      audit_logs: [
-        {
-          id: "log-init",
-          timestamp: new Date().toISOString(),
-          action: "SYSTEM_INITIALIZED",
-          target_type: "SYSTEM",
-          target_id: "ALL",
-          details: "Superior Project Showcase platform initialized with faculty seed.",
-        },
-      ],
-    };
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(initialDb, null, 2), "utf8");
-    return initialDb;
+    ],
+  };
+}
+
+// Ensure database exists for persistence (Serverless & Read-only Safe)
+function ensureLocalDb(): LocalDatabase {
+  if (memoryDb) {
+    return memoryDb;
   }
 
   try {
+    const dir = path.dirname(DB_FILE_PATH);
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch (err) {
+        console.warn("[SheetsAdapter] Could not create db dir (ignoring for memory fallback):", err);
+      }
+    }
+
+    if (!fs.existsSync(DB_FILE_PATH)) {
+      const initialDb = createDefaultDb();
+      try {
+        fs.writeFileSync(DB_FILE_PATH, JSON.stringify(initialDb, null, 2), "utf8");
+      } catch (err) {
+        console.warn("[SheetsAdapter] Could not write initial db (using memory fallback):", err);
+      }
+      memoryDb = initialDb;
+      return initialDb;
+    }
+
     const content = fs.readFileSync(DB_FILE_PATH, "utf8");
-    return JSON.parse(content);
-  } catch {
-    const freshDb: LocalDatabase = {
-      projects: getInitialSeedProjects(),
-      teachers: getInitialSeedTeachers(),
-      teachers_pending: [],
-      sync_meta: {
-        last_hash: "initial_seeded_hash_2026",
-        last_synced_at: new Date().toISOString(),
-        last_check_status: "ok",
-      },
-      sync_logs: [],
-      queries: getInitialSeedQueries(),
-      audit_logs: [],
-    };
-    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(freshDb, null, 2), "utf8");
-    return freshDb;
+    memoryDb = JSON.parse(content);
+    return memoryDb!;
+  } catch (err) {
+    console.warn("[SheetsAdapter] Failed to load local db from file, using fresh in-memory db:", err);
+    memoryDb = createDefaultDb();
+    return memoryDb;
   }
 }
 
 function saveLocalDb(db: LocalDatabase) {
-  const dir = path.dirname(DB_FILE_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  memoryDb = db;
+  try {
+    const dir = path.dirname(DB_FILE_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf8");
+  } catch (err) {
+    console.warn("[SheetsAdapter] Could not persist local db to disk (in-memory state preserved):", err);
   }
-  fs.writeFileSync(DB_FILE_PATH, JSON.stringify(db, null, 2), "utf8");
 }
 
 // ----------------------------------------------------
