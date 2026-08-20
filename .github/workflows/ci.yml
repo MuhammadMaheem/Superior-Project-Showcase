@@ -1,0 +1,47 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: TypeCheck, Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeCheck (TypeScript)
+        run: npx tsc --noEmit
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+          # Pass dummy build env vars so build succeeds in CI
+          GOOGLE_SERVICE_ACCOUNT_EMAIL: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_EMAIL || 'bot@superior-showcase.iam.gserviceaccount.com' }}
+          GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || '-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQ\n-----END PRIVATE KEY-----\n' }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID || '1A3lY1zjchHgydSXzUdDH1oR8aIobVwy5t2TgLU_a9o8' }}
+          ADMIN_PASSWORD_HASH: ${{ secrets.ADMIN_PASSWORD_HASH || '$2b$10$8jTzufWlY3SobTXPIhffruN/DZtO4YmSAVEbob7pviHy08vz2t8d6' }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET || 'superior-showcase-jwt-secret-key-32-chars-long-secure' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET || 'superior-cron-sync-secret-2026' }}

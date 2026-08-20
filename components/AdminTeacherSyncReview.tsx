@@ -8,14 +8,8 @@ import {
   Edit3,
   Check,
   X,
-  AlertCircle,
-  Users,
   Search,
-  Sparkles,
   Loader2,
-  Clock,
-  ArrowRight,
-  ShieldCheck,
 } from "lucide-react";
 import type { Teacher, TeacherPending, TeacherSyncLog, TeacherSyncMeta } from "@/lib/sheets/models";
 import { formatDate } from "@/lib/utils";
@@ -255,7 +249,7 @@ export function AdminTeacherSyncReview({
               Review & Inline-Correct Pending Faculty
             </h3>
             <p className="text-xs text-slate-400">
-              The live source contains real typos (e.g. "Thoery" vs "Theory"). Click <strong>Edit</strong> to fix mistakes before clicking <strong>Approve</strong>.
+              The live source contains real typos (e.g. &ldquo;Thoery&rdquo; vs &ldquo;Theory&rdquo;). Click <strong>Edit</strong> to fix mistakes before clicking <strong>Approve</strong>.
             </p>
           </div>
 

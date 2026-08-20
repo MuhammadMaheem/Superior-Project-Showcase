@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import Image from "next/image";
 import {
   Search,
   Eye,
@@ -13,17 +12,11 @@ import {
   X,
   AlertTriangle,
   Loader2,
-  RefreshCw,
   PlusCircle,
   User,
   BookOpen,
   Layers,
   Globe,
-  FileText,
-  Sparkles,
-  Shield,
-  Tag,
-  Link2,
 } from "lucide-react";
 import { GithubIcon } from "@/components/Icons";
 import { FacultyCombobox } from "@/components/FacultyCombobox";
@@ -187,7 +180,7 @@ export function AdminProjectsManager({
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as any)}
+            onChange={(e) => setStatusFilter(e.target.value as "all" | "published" | "hidden")}
             className="rounded-xl border border-[#1f293d] bg-[#111827] px-3 py-2 text-xs text-white focus:border-blue-500 focus:outline-none"
           >
             <option value="all">All Statuses</option>

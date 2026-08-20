@@ -1,0 +1,32 @@
+name: Daily Faculty Workload Sync
+
+on:
+  schedule:
+    # Runs every day at 00:00 UTC (5:00 AM PKT)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  sync:
+    name: Trigger Faculty Sync Endpoint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Faculty Sync API
+        run: |
+          echo "Triggering 24h faculty synchronization endpoint on production..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://superior-project-showcase.vercel.app/api/cron/sync-teachers" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET || 'superior-cron-sync-secret-2026' }}" \
+            -H "Content-Type: application/json")
+          
+          HTTP_BODY=$(echo "$RESPONSE" | sed -e '$d')
+          HTTP_STATUS=$(echo "$RESPONSE" | tail -n1 | cut -d':' -f2)
+
+          echo "Response Body: $HTTP_BODY"
+          echo "Status Code: $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Faculty sync failed with status $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Faculty sync successfully triggered and processed!"

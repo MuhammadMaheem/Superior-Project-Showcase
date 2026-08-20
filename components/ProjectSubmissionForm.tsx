@@ -1,24 +1,17 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
   Upload,
   X,
-  ExternalLink,
-  Mail,
-  UserCheck,
-  BookOpen,
-  Hash,
-  Layers,
   ArrowRight,
   Loader2,
 } from "lucide-react";
-import { GithubIcon, LinkedinIcon } from "@/components/Icons";
+import { GithubIcon } from "@/components/Icons";
 import { FacultyCombobox } from "@/components/FacultyCombobox";
 import confetti from "canvas-confetti";
 import type { Teacher, Project } from "@/lib/sheets/models";
@@ -236,7 +229,7 @@ export function ProjectSubmissionForm({ teachers, subjects }: ProjectSubmissionF
             Project Successfully Registered!
           </h2>
           <p className="text-sm text-slate-300">
-            Congratulations <strong className="text-white">{submittedProject.student_name}</strong>! Your capstone project <strong className="text-blue-400">"{submittedProject.project_title}"</strong> is now live on the public showcase.
+            Congratulations <strong className="text-white">{submittedProject.student_name}</strong>! Your capstone project <strong className="text-blue-400">&ldquo;{submittedProject.project_title}&rdquo;</strong> is now live on the public showcase.
           </p>
         </div>
 

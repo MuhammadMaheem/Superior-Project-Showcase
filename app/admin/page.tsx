@@ -8,10 +8,7 @@ import {
   Users,
   MessageSquare,
   ArrowRight,
-  Sparkles,
   RefreshCw,
-  Clock,
-  ShieldCheck,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -184,7 +181,7 @@ export default async function AdminDashboardPage() {
                 <span className="font-bold text-white">{openQueries[0].name} ({openQueries[0].roll_number || "Student"})</span>
                 <span className="text-[10px] font-mono">{formatDate(openQueries[0].submitted_at)}</span>
               </div>
-              <p className="text-slate-300 line-clamp-2 italic">"{openQueries[0].message}"</p>
+              <p className="text-slate-300 line-clamp-2 italic">&ldquo;{openQueries[0].message}&rdquo;</p>
             </div>
           ) : (
             <div className="rounded-2xl border border-[#1f293d] bg-[#0a0f1d] p-4 text-center text-xs text-slate-400">
