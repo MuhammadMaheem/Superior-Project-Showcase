@@ -24,7 +24,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname();
   const router = useRouter();
   const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true);
 
   useEffect(() => {
     if (pathname === "/admin/login") return;
@@ -36,8 +35,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setSessionUser(data.user);
         }
       })
-      .catch(() => {})
-      .finally(() => setLoadingUser(false));
+      .catch(() => {});
   }, [pathname]);
 
   // If on login page, render children directly without sidebar

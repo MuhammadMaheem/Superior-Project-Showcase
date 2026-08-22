@@ -21,12 +21,8 @@ import {
   Send,
   ShieldAlert,
   ShieldCheck,
-  TrendingUp,
-  Sparkles,
-  ArrowRight,
   GraduationCap,
   GitCompare,
-  Copy,
 } from "lucide-react";
 import { GithubIcon } from "@/components/Icons";
 import { FacultyCombobox } from "@/components/FacultyCombobox";

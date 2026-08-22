@@ -28,7 +28,7 @@ export class FirebaseDataAdapter {
 
   async getProjects(filter?: { publishedOnly?: boolean }): Promise<Project[]> {
     const db = this.getDb();
-    let queryRef = db.collection("projects") as any;
+    let queryRef: FirebaseFirestore.Query = db.collection("projects");
     if (filter?.publishedOnly) {
       queryRef = queryRef.where("status", "==", "published");
     }

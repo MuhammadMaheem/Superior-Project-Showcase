@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { GraduationCap, BookOpen, Layers, Mail, ShieldCheck } from "lucide-react";
+import { GraduationCap } from "lucide-react";
 
 export function Footer() {
   return (

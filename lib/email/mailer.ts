@@ -89,11 +89,12 @@ export async function sendEmail(payload: EmailPayload): Promise<SendEmailResult>
       messageId: info.messageId,
       mocked: false,
     };
-  } catch (err: any) {
-    console.error("[Mailer Error] Failed to send email via Gmail SMTP:", err);
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Failed to send email via SMTP";
+    console.error("[Mailer Error] Failed to send email via Gmail SMTP:", errorMessage);
     return {
       success: false,
-      error: err.message || "Failed to send email via SMTP",
+      error: errorMessage,
     };
   }
 }

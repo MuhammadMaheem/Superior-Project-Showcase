@@ -34,6 +34,9 @@ jobs:
       - name: Lint (ESLint)
         run: npm run lint
 
+      - name: Run QA Test Suite
+        run: npx tsx scripts/test_suite.ts
+
       - name: Build Next.js Application
         run: npm run build
         env:

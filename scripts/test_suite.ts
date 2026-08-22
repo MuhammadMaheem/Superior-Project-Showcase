@@ -2,7 +2,7 @@ import { sanitizeForSheet, unescapeFromSheet } from "../lib/sheets/sanitize";
 import { parseAndValidateGitHubUrl } from "../lib/security/ssrf";
 import { validateImageMagicBytes } from "../lib/security/image";
 import { normalizeTeachers, computeHash } from "../lib/sync/teachers";
-import { normalizeVideoEmbedUrl, ProjectSubmissionSchema } from "../lib/sheets/models";
+import { normalizeVideoEmbedUrl, ProjectSubmissionSchema, type Project } from "../lib/sheets/models";
 import { parseSuperiorRollNumber } from "../lib/utils/roll-number";
 import { normalizeRepoUrl, evaluateProjectSimilarity } from "../lib/similarity/detector";
 import { hashPassword, verifyPassword } from "../lib/auth/accounts";
@@ -128,7 +128,7 @@ const canonical1 = normalizeRepoUrl("https://github.com/facebook/react.git/");
 const canonical2 = normalizeRepoUrl("http://github.com/FACEBOOK/React");
 assert(canonical1 === canonical2 && canonical1 === "github.com/facebook/react", "Normalize GitHub URLs to canonical owner/repo identifier");
 
-const mockExistingProjects: any[] = [
+const mockExistingProjects: Project[] = [
   {
     id: "proj-1",
     github_url: "https://github.com/superior/agent-swarm",
@@ -136,6 +136,14 @@ const mockExistingProjects: any[] = [
     description: "Multi-agent collaborative framework for deep academic exploration.",
     tech_stack: "Python, FastAPI, LangChain, React",
     roll_number: "SU92-BSAIM-F24-054",
+    student_name: "Ali Hassan",
+    student_avatar_url: "",
+    batch_section: "BSAI-8A",
+    subject: "Deep Learning",
+    supervisor_name: "Dr. Ahmed Bilal",
+    submitted_at: "2026-08-01T00:00:00Z",
+    updated_at: "2026-08-01T00:00:00Z",
+    status: "published",
   },
 ];
 
