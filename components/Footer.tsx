@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { GraduationCap, ShieldAlert, BookOpen, Layers } from "lucide-react";
-import { GithubIcon } from "@/components/Icons";
+import { GraduationCap, BookOpen, Layers, Mail, ShieldCheck } from "lucide-react";
 
 export function Footer() {
   return (
@@ -18,22 +17,22 @@ export function Footer() {
               </span>
             </div>
             <p className="text-xs text-[#94a3b8] leading-relaxed max-w-md">
-              The central academic portfolio registry for student final year projects, research prototypes, and course capstones. Mentored by University faculty.
+              The official academic repository and capstone portfolio registry for the Faculty of Computer Science & Information Technology at Superior University. Mentored by faculty supervisors.
             </p>
             <div className="flex items-center gap-3 pt-1">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-[11px] font-mono font-medium text-emerald-400 border border-emerald-500/20">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live Sync Engine Active
+                Live Academic Registry
               </span>
               <span className="text-[11px] font-mono text-slate-500">
-                Data store: Google Sheets API v4
+                Superior University Lahore
               </span>
             </div>
           </div>
 
           {/* Quick Links */}
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-white">Registry Navigation</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-white">Showcase Navigation</h4>
             <ul className="space-y-2 text-xs">
               <li>
                 <Link href="/" className="hover:text-blue-400 transition-colors">
@@ -42,50 +41,54 @@ export function Footer() {
               </li>
               <li>
                 <Link href="/submit" className="hover:text-blue-400 transition-colors">
-                  Submit Capstone Project
+                  Register Capstone Project
                 </Link>
               </li>
               <li>
                 <Link href="/help" className="hover:text-blue-400 transition-colors">
-                  Request Correction / Edit
+                  Student Help & Edit Desk
                 </Link>
               </li>
               <li>
                 <Link href="/admin/login" className="hover:text-blue-400 transition-colors">
-                  Faculty Super-Admin Portal
+                  Faculty & Admin Workbench
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Academic Governance */}
+          {/* Degree Programs */}
           <div className="space-y-3">
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-white">Governance & Security</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-white">Programs & Degrees</h4>
             <ul className="space-y-2 text-xs">
-              <li className="flex items-center gap-1.5 text-slate-400">
-                <ShieldAlert className="h-3.5 w-3.5 text-blue-400" />
-                <span>Formula Injection Sanitized</span>
+              <li className="flex items-center gap-1.5 text-slate-300">
+                <span className="font-mono text-blue-400">BSAI</span>
+                <span>Artificial Intelligence</span>
               </li>
-              <li className="flex items-center gap-1.5 text-slate-400">
-                <GithubIcon className="h-3.5 w-3.5 text-blue-400" />
-                <span>SSRF Guarded GitHub Fetch</span>
+              <li className="flex items-center gap-1.5 text-slate-300">
+                <span className="font-mono text-blue-400">BSCS</span>
+                <span>Computer Science</span>
               </li>
-              <li className="flex items-center gap-1.5 text-slate-400">
-                <Layers className="h-3.5 w-3.5 text-blue-400" />
-                <span>Magic Byte Image Verification</span>
+              <li className="flex items-center gap-1.5 text-slate-300">
+                <span className="font-mono text-blue-400">BSSE</span>
+                <span>Software Engineering</span>
               </li>
-              <li className="flex items-center gap-1.5 text-slate-400">
-                <BookOpen className="h-3.5 w-3.5 text-blue-400" />
-                <span>24h Faculty Diff Staging</span>
+              <li className="flex items-center gap-1.5 text-slate-300">
+                <span className="font-mono text-blue-400">BSDS</span>
+                <span>Data Science</span>
+              </li>
+              <li className="flex items-center gap-1.5 text-slate-300">
+                <span className="font-mono text-blue-400">BSIT</span>
+                <span>Information Technology</span>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="mt-8 pt-6 border-t border-[#1f293d] flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] text-slate-500">
-          <p>© 2026 Superior Academic Tooling. Built for students & faculty excellence.</p>
+          <p>© {new Date().getFullYear()} Superior University · Faculty of Computer Science & IT. All rights reserved.</p>
           <div className="font-mono text-[10px] text-slate-400">
-            SYSTEM VERSION 2.6.4 · APP ROUTER · SECURE REPOSITORY
+            OFFICIAL UNIVERSITY CAPSTONE SHOWCASE
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyAdminSessionToken, SESSION_COOKIE_NAME } from "./lib/auth/session";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isAdminPage = pathname.startsWith("/admin");
@@ -34,7 +34,7 @@ export async function middleware(request: NextRequest) {
   if (!isAuthenticated) {
     if (isAdminApi) {
       return NextResponse.json(
-        { error: "Unauthorized access: valid super-admin session required" },
+        { error: "Unauthorized access: valid session required" },
         { status: 401 }
       );
     }

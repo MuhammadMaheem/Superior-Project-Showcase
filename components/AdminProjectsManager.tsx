@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search,
   Eye,
@@ -36,7 +36,7 @@ import {
   type SimilarityMatch,
   type ProjectComparisonDetail,
 } from "@/lib/similarity/detector";
-import type { Project, Teacher } from "@/lib/sheets/models";
+import type { Project, Teacher, SessionUser } from "@/lib/sheets/models";
 import { formatDate } from "@/lib/utils";
 import Link from "next/link";
 
@@ -54,6 +54,25 @@ export function AdminProjectsManager({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "published" | "hidden">("all");
   const [supervisorFilter, setSupervisorFilter] = useState("all");
+  const [sessionUser, setSessionUser] = useState<SessionUser | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.authenticated && data.user) {
+          setSessionUser(data.user);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const isSuperAdmin = !sessionUser || sessionUser.role === "SUPER_ADMIN";
+  const canViewAll = isSuperAdmin || Boolean(sessionUser?.permissions?.can_view_all_projects);
+  const canEdit = isSuperAdmin || Boolean(sessionUser?.permissions?.can_edit_projects);
+  const canDelete = isSuperAdmin || Boolean(sessionUser?.permissions?.can_delete_projects);
+  const canInquire = isSuperAdmin || Boolean(sessionUser?.permissions?.can_send_inquiries);
+  const canEscalate = isSuperAdmin || Boolean(sessionUser?.permissions?.can_escalate_faculty);
 
   // Distinct supervisors for filter (including teachers directory and custom project supervisors)
   const allSupervisors = useMemo(() => {
@@ -102,6 +121,17 @@ export function AdminProjectsManager({
 
   // Filtered List
   const filtered = projects.filter((p) => {
+    // 1. Scoped access for teachers without 'can_view_all_projects'
+    if (!canViewAll && sessionUser) {
+      const isMySupervisor =
+        p.supervisor_name.toLowerCase().includes(sessionUser.name.toLowerCase()) ||
+        sessionUser.name.toLowerCase().includes(p.supervisor_name.toLowerCase());
+      const isMySubject =
+        sessionUser.assigned_subjects &&
+        sessionUser.assigned_subjects.includes(p.subject);
+      if (!isMySupervisor && !isMySubject) return false;
+    }
+
     if (statusFilter !== "all" && p.status !== statusFilter) return false;
     if (supervisorFilter !== "all" && p.supervisor_name !== supervisorFilter) return false;
     if (search) {
@@ -397,6 +427,16 @@ export function AdminProjectsManager({
         </div>
       </div>
 
+      {/* Scoped View Notice for Teachers */}
+      {!canViewAll && sessionUser && (
+        <div className="flex items-center gap-2.5 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 p-4 text-xs font-mono text-indigo-300">
+          <GraduationCap className="h-4 w-4 text-indigo-400 shrink-0" />
+          <span>
+            <strong>Scoped Faculty View</strong>: Showing capstone submissions supervised by <strong>{sessionUser.name}</strong> ({filtered.length} projects).
+          </span>
+        </div>
+      )}
+
       {/* Projects Table */}
       <div className="rounded-3xl border border-[#1f293d] bg-[#111827] overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
@@ -423,55 +463,71 @@ export function AdminProjectsManager({
               ) : (
                 filtered.map((p) => {
                   const sim = similarityMap.get(p.id);
+
                   return (
-                    <tr key={p.id} className="hover:bg-[#1e293b]/40 transition-colors">
-                      {/* Project Title & Links */}
+                    <tr key={p.id} className="hover:bg-[#1a2333]/50 transition-colors">
+                      {/* Project Title & Link */}
                       <td className="py-3.5 px-4 max-w-xs">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-white truncate">{p.project_title}</p>
-                          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-white truncate text-xs sm:text-sm">{p.project_title}</p>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
                             {p.github_url && (
                               <a
                                 href={p.github_url}
                                 target="_blank"
-                                rel="noreferrer"
-                                className="hover:text-blue-400 flex items-center gap-0.5"
+                                rel="noopener noreferrer"
+                                className="hover:text-blue-400 flex items-center gap-1"
                               >
                                 <GithubIcon className="h-3 w-3" />
-                                <span>GitHub</span>
+                                <span>Code</span>
                               </a>
                             )}
                             {p.live_url && (
                               <a
                                 href={p.live_url}
                                 target="_blank"
-                                rel="noreferrer"
-                                className="hover:text-emerald-400 flex items-center gap-0.5"
+                                rel="noopener noreferrer"
+                                className="hover:text-emerald-400 flex items-center gap-1 text-emerald-400/80"
                               >
                                 <ExternalLink className="h-3 w-3" />
-                                <span>Demo</span>
+                                <span>Live Demo</span>
                               </a>
                             )}
                           </div>
                         </div>
                       </td>
 
-                      {/* Student Name */}
-                      <td className="py-3.5 px-4 font-medium text-white">{p.student_name}</td>
+                      {/* Student Info */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-2">
+                          {p.student_avatar_url ? (
+                            <img
+                              src={p.student_avatar_url}
+                              alt={p.student_name}
+                              className="h-6 w-6 rounded-full border border-slate-700 object-cover"
+                            />
+                          ) : (
+                            <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] text-slate-400">
+                              <User className="h-3 w-3" />
+                            </div>
+                          )}
+                          <span className="font-medium text-slate-200">{p.student_name}</span>
+                        </div>
+                      </td>
 
-                      {/* Roll No */}
-                      <td className="py-3.5 px-4 font-mono text-slate-400">{p.roll_number}</td>
+                      {/* Roll Number */}
+                      <td className="py-3.5 px-4 font-mono text-slate-300">{p.roll_number}</td>
 
-                      {/* Originality & Similarity Badge */}
+                      {/* Originality / Similarity Badge */}
                       <td className="py-3.5 px-4">
                         {sim && sim.flag === "duplicate" ? (
                           <button
                             onClick={() => (sim.matchedProject ? handleOpenCompare(p, sim) : handleOpenInquire(p, sim))}
-                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold bg-rose-500/15 text-rose-400 border border-rose-500/30 hover:bg-rose-500/25 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30 transition-all cursor-pointer animate-pulse"
                             title="Click to inspect side-by-side comparison with archive project"
                           >
-                            <ShieldAlert className="h-3 w-3 animate-pulse" />
-                            <span>{sim.exactUrlMatch ? "Duplicate URL" : `${sim.score}% Overlap`}</span>
+                            <ShieldAlert className="h-3 w-3" />
+                            <span>Duplicate URL</span>
                             <GitCompare className="h-2.5 w-2.5 opacity-70 ml-0.5" />
                           </button>
                         ) : sim && sim.flag === "warning" ? (
@@ -505,26 +561,38 @@ export function AdminProjectsManager({
 
                       {/* Status Badge */}
                       <td className="py-3.5 px-4">
-                        <button
-                          onClick={() => handleToggleStatus(p)}
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold transition-all hover:scale-105 ${
-                            p.status === "published"
-                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20"
-                          }`}
-                        >
-                          {p.status === "published" ? (
-                            <>
-                              <Eye className="h-3 w-3" />
-                              <span>Published</span>
-                            </>
-                          ) : (
-                            <>
-                              <EyeOff className="h-3 w-3" />
-                              <span>Hidden</span>
-                            </>
-                          )}
-                        </button>
+                        {canEdit ? (
+                          <button
+                            onClick={() => handleToggleStatus(p)}
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold transition-all hover:scale-105 ${
+                              p.status === "published"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
+                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20"
+                            }`}
+                          >
+                            {p.status === "published" ? (
+                              <>
+                                <Eye className="h-3 w-3" />
+                                <span>Published</span>
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="h-3 w-3" />
+                                <span>Hidden</span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold ${
+                              p.status === "published"
+                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            }`}
+                          >
+                            {p.status === "published" ? "Published" : "Hidden"}
+                          </span>
+                        )}
                       </td>
 
                       {/* Action Buttons */}
@@ -542,40 +610,48 @@ export function AdminProjectsManager({
                           )}
 
                           {/* Mail Student Inquiry */}
-                          <button
-                            onClick={() => handleOpenInquire(p, sim)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-blue-400 hover:bg-blue-600 hover:text-white transition-colors"
-                            title="Send Plagiarism / Inquiry Notice (Gmail)"
-                          >
-                            <Mail className="h-3.5 w-3.5" />
-                          </button>
+                          {canInquire && (
+                            <button
+                              onClick={() => handleOpenInquire(p, sim)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-blue-400 hover:bg-blue-600 hover:text-white transition-colors"
+                              title="Send Plagiarism / Inquiry Notice (Gmail)"
+                            >
+                              <Mail className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
                           {/* Escalate to Faculty */}
-                          <button
-                            onClick={() => handleOpenEscalate(p, sim)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-amber-400 hover:bg-amber-600 hover:text-white transition-colors"
-                            title="Escalate Dossier to Faculty Supervisor"
-                          >
-                            <ShieldAlert className="h-3.5 w-3.5" />
-                          </button>
+                          {canEscalate && (
+                            <button
+                              onClick={() => handleOpenEscalate(p, sim)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-amber-400 hover:bg-amber-600 hover:text-white transition-colors"
+                              title="Escalate Dossier to Faculty Supervisor"
+                            >
+                              <ShieldAlert className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
                           {/* Edit */}
-                          <button
-                            onClick={() => setEditingProject(p)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-slate-300 hover:bg-blue-600 hover:text-white transition-colors"
-                            title="Edit Project"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => setEditingProject(p)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-slate-300 hover:bg-blue-600 hover:text-white transition-colors"
+                              title="Edit Project"
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
 
                           {/* Delete */}
-                          <button
-                            onClick={() => setDeletingProjectId(p.id)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-rose-400 hover:bg-rose-600 hover:text-white transition-colors"
-                            title="Delete Project"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          {canDelete && (
+                            <button
+                              onClick={() => setDeletingProjectId(p.id)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-rose-400 hover:bg-rose-600 hover:text-white transition-colors"
+                              title="Delete Project"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

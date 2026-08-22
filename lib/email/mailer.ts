@@ -42,17 +42,16 @@ function getTransporter() {
 }
 
 /**
- * Generates a standard filterable reference code for university emails
- * Example: SPS-INQ-2026-F24-042 or SPS-ESC-2026-042
+ * Generates an official SPS reference code for email tracking and filtering
  */
-export function generateReferenceCode(type: "INQ" | "ESC", rollNumber?: string): string {
+export function generateReferenceCode(type: "INQ" | "ESC" | "CRED", identifier?: string): string {
   const year = new Date().getFullYear();
-  const cleanRoll = (rollNumber || "GEN")
+  const cleanId = (identifier || "FAC")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
-  const suffix = cleanRoll.slice(-8) || crypto.randomBytes(2).toString("hex").toUpperCase();
+  const suffix = cleanId.slice(-8) || crypto.randomBytes(2).toString("hex").toUpperCase();
   return `SPS-${type}-${year}-${suffix}`;
 }
 
@@ -444,6 +443,108 @@ export function generateTeacherEscalationEmail(params: {
     <div class="footer">
       <p style="margin: 0 0 4px 0;">© ${new Date().getFullYear()} Superior University — Internal Faculty Disciplinary Transmission.</p>
       <p style="margin: 0;">Case ID: <code>${refCode}</code> · Direct reply enabled for supervisory findings submission.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  return { subject, html, refCode };
+}
+
+/**
+ * Generates an executive university welcome email with faculty login credentials & permissions
+ */
+export function generateTeacherCredentialsEmail(params: {
+  teacherName: string;
+  teacherEmail: string;
+  temporaryPassword: string;
+  designation?: string;
+  loginUrl: string;
+  permissionsList: string[];
+}): { subject: string; html: string; refCode: string } {
+  const refCode = generateReferenceCode("CRED", params.teacherEmail.split("@")[0]);
+  const subject = `[${refCode}] Faculty Portal Access & Credentials — Superior University Capstone Showcase`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faculty Portal Credentials</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #0a0f1d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc; }
+    .container { max-width: 620px; margin: 24px auto; background-color: #111827; border: 1px solid #1f293d; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    .header { background: linear-gradient(135deg, #1e3a8a 0%, #1e1b4b 100%); padding: 32px 24px; border-bottom: 2px solid #3b82f6; text-align: center; }
+    .badge { display: inline-block; background: rgba(59, 130, 246, 0.2); border: 1px solid rgba(59, 130, 246, 0.4); color: #93c5fd; font-size: 11px; font-weight: 700; font-family: monospace; padding: 4px 10px; border-radius: 9999px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 12px; }
+    .content { padding: 32px 24px; }
+    .cred-card { background-color: #0a0f1d; border: 1px solid #2563eb; border-radius: 12px; padding: 20px; margin: 20px 0; }
+    .btn { display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%); color: #ffffff !important; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 24px; border-radius: 10px; margin-top: 16px; }
+    .footer { padding: 20px 24px; background-color: #0a0f1d; border-top: 1px solid #1f293d; font-size: 11px; color: #64748b; text-align: center; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="badge">Superior University · Faculty Access Authorization</div>
+      <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em;">Faculty Workbench Credentials</h1>
+      <p style="margin: 6px 0 0 0; font-size: 13px; color: #93c5fd;">Department of Computer Science & Information Technology</p>
+    </div>
+
+    <div class="content">
+      <p style="font-size: 15px; color: #f8fafc; margin-top: 0;">
+        Dear <strong>${params.teacherName}</strong>${params.designation ? ` (${params.designation})` : ""},
+      </p>
+
+      <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+        Your faculty administrator account has been provisioned on the <strong>Superior University Project Showcase Platform</strong>. You may now securely log in to supervise student capstone submissions, evaluate viva presentations, and manage academic queries.
+      </p>
+
+      <div class="cred-card">
+        <div style="font-size: 11px; font-family: monospace; color: #60a5fa; font-weight: 700; text-transform: uppercase; margin-bottom: 12px;">
+          Your Secure Login Credentials
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0; width: 140px;">Portal URL:</td>
+            <td style="color: #ffffff; padding: 6px 0;"><a href="${params.loginUrl}" style="color: #60a5fa; text-decoration: underline;">${params.loginUrl}</a></td>
+          </tr>
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">University Email:</td>
+            <td style="color: #ffffff; font-family: monospace; padding: 6px 0; font-weight: bold;">${params.teacherEmail}</td>
+          </tr>
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">Temporary Password:</td>
+            <td style="padding: 6px 0;">
+              <code style="background: rgba(59, 130, 246, 0.2); color: #38bdf8; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 14px; border: 1px solid rgba(56, 189, 248, 0.3);">${params.temporaryPassword}</code>
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #1f293d; border-radius: 12px; padding: 16px; margin: 20px 0;">
+        <div style="font-size: 11px; font-family: monospace; color: #cbd5e1; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">
+          Authorized Permissions & Access Scope
+        </div>
+        <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: #94a3b8; line-height: 1.7;">
+          ${params.permissionsList.map((p) => `<li><strong style="color: #e2e8f0;">${p}</strong></li>`).join("")}
+        </ul>
+      </div>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${params.loginUrl}" class="btn">Sign In to Faculty Workbench →</a>
+      </div>
+
+      <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #1f293d; font-size: 12px; color: #94a3b8;">
+        <div style="font-weight: 700; color: #ffffff;">Office of Academic Administration</div>
+        <div>Faculty of Computer Science & Information Technology · Superior University</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p style="margin: 0 0 4px 0;">© ${new Date().getFullYear()} Superior University — Confidential Faculty Access Dispatch.</p>
+      <p style="margin: 0;">Reference ID: <code>${refCode}</code> · Please do not share temporary credentials.</p>
     </div>
   </div>
 </body>

@@ -5,6 +5,8 @@ import { normalizeTeachers, computeHash } from "../lib/sync/teachers";
 import { normalizeVideoEmbedUrl, ProjectSubmissionSchema } from "../lib/sheets/models";
 import { parseSuperiorRollNumber } from "../lib/utils/roll-number";
 import { normalizeRepoUrl, evaluateProjectSimilarity } from "../lib/similarity/detector";
+import { hashPassword, verifyPassword } from "../lib/auth/accounts";
+import { generateReferenceCode } from "../lib/email/mailer";
 
 console.log("=================================================");
 console.log("  SUPERIOR PROJECT SHOWCASE - QA TEST SUITE      ");
@@ -159,6 +161,19 @@ const uniqueCheck = evaluateProjectSimilarity(
 );
 assert(uniqueCheck.flag === "unique" && uniqueCheck.score < 25, "Verify unique original project submission");
 
+// 8. Role-Based Access Control & Password Hashing
+console.log("\n[8/8] Testing RBAC & Teacher Account Security...");
+
+const testPlainPassword = "SuperiorTeacher2026!";
+const testHash = hashPassword(testPlainPassword);
+assert(testHash.includes(":") && testHash.length > 50, "Hash password with salt and PBKDF2");
+assert(verifyPassword(testPlainPassword, testHash), "Verify matching plaintext password");
+assert(!verifyPassword("WrongPassword123", testHash), "Reject incorrect password");
+
+const credRefCode = generateReferenceCode("CRED", "DR-AHMED");
+assert(credRefCode.startsWith("SPS-CRED-") && credRefCode.includes("2026"), "Generate valid credentials email reference code");
+
+// Print Summary
 console.log("\n=================================================");
 console.log(`  RESULTS: ${passed} PASSED, ${failed} FAILED`);
 console.log("=================================================\n");

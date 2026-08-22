@@ -98,6 +98,59 @@ export interface VisitorEvent {
   ipHash?: string;
 }
 
+export interface TeacherPermissions {
+  can_view_all_projects: boolean; // true = all projects; false = only their supervised projects
+  can_edit_projects: boolean;     // Can edit project status, title, details
+  can_delete_projects: boolean;   // Can delete projects
+  can_send_inquiries: boolean;    // Can send similarity inquiry emails to students
+  can_escalate_faculty: boolean;  // Can escalate dossiers to disciplinary faculty
+  can_manage_queries: boolean;    // Can view & resolve student help desk queries
+  can_view_telemetry: boolean;    // Can view visitor analytics & traffic graphs
+}
+
+export const DEFAULT_TEACHER_PERMISSIONS: TeacherPermissions = {
+  can_view_all_projects: true,
+  can_edit_projects: false,
+  can_delete_projects: false,
+  can_send_inquiries: true,
+  can_escalate_faculty: true,
+  can_manage_queries: false,
+  can_view_telemetry: false,
+};
+
+export const SUPER_ADMIN_PERMISSIONS: TeacherPermissions = {
+  can_view_all_projects: true,
+  can_edit_projects: true,
+  can_delete_projects: true,
+  can_send_inquiries: true,
+  can_escalate_faculty: true,
+  can_manage_queries: true,
+  can_view_telemetry: true,
+};
+
+export interface TeacherAccount {
+  id: string;                      // "usr-teacher-xxxx"
+  email: string;                   // "dr.ahmed@superior.edu.pk"
+  name: string;                    // "Dr. Ahmed Bilal"
+  designation: string;             // "Associate Professor & FYP Evaluator"
+  password_hash: string;           // Salted password hash
+  is_active: boolean;              // true = Active, false = Suspended
+  role: "TEACHER" | "SUPER_ADMIN";
+  permissions: TeacherPermissions;
+  assigned_subjects?: string[];    // e.g. ["Deep Learning", "Machine Learning"]
+  created_at: string;
+  last_login_at?: string;
+}
+
+export interface SessionUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "SUPER_ADMIN" | "TEACHER";
+  permissions: TeacherPermissions;
+  assigned_subjects?: string[];
+}
+
 export interface TrafficStats {
   totalPageviews: number;
   uniqueVisitors: number;
