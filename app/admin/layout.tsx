@@ -9,6 +9,7 @@ import {
   Users,
   MessageSquare,
   ShieldAlert,
+  Activity,
   LogOut,
   ExternalLink,
   Sparkles,
@@ -49,6 +50,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       href: "/admin/queries",
       icon: MessageSquare,
       id: "tour-nav-queries",
+    },
+    {
+      label: "Performance & Telemetry",
+      href: "/admin/telemetry",
+      icon: Activity,
+      id: "tour-nav-telemetry",
     },
     {
       label: "Audit Trail",

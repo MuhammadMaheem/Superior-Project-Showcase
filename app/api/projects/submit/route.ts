@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { dataAdapter } from "@/lib/sheets/adapter";
 import { ProjectSubmissionSchema } from "@/lib/sheets/models";
 import { checkRateLimit, getClientIp } from "@/lib/auth/rate-limit";
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
       tech_stack: data.tech_stack.trim(),
       github_url: data.github_url.trim(),
       live_url: data.live_url?.trim() || "",
+      video_url: data.video_url?.trim() || "",
       linkedin_url: data.linkedin_url?.trim() || "",
       email: data.email?.trim() || "",
       batch_section: data.batch_section.trim(),
@@ -84,6 +86,13 @@ export async function POST(request: NextRequest) {
       screenshot_4: processedScreenshots[3] || "",
       status: "published",
     });
+
+    try {
+      revalidatePath("/");
+      revalidatePath("/admin/projects");
+    } catch {
+      // Ignore in non-SSR
+    }
 
     return NextResponse.json(
       {

@@ -2,6 +2,9 @@ import { sanitizeForSheet, unescapeFromSheet } from "../lib/sheets/sanitize";
 import { parseAndValidateGitHubUrl } from "../lib/security/ssrf";
 import { validateImageMagicBytes } from "../lib/security/image";
 import { normalizeTeachers, computeHash } from "../lib/sync/teachers";
+import { normalizeVideoEmbedUrl, ProjectSubmissionSchema } from "../lib/sheets/models";
+import { parseSuperiorRollNumber } from "../lib/utils/roll-number";
+import { normalizeRepoUrl, evaluateProjectSimilarity } from "../lib/similarity/detector";
 
 console.log("=================================================");
 console.log("  SUPERIOR PROJECT SHOWCASE - QA TEST SUITE      ");
@@ -21,7 +24,7 @@ function assert(condition: boolean, testName: string) {
 }
 
 // 1. Formula Injection Neutralization
-console.log("[1/4] Testing Google Sheets Formula Injection Sanitizer (§6.4)...");
+console.log("[1/5] Testing Google Sheets Formula Injection Sanitizer (§6.4)...");
 assert(sanitizeForSheet("=SUM(A1:B10)") === "'=SUM(A1:B10)", "Neutralize = (equals formula)");
 assert(sanitizeForSheet("+cmd|' /C calc'") === "'+cmd|' /C calc'", "Neutralize + (plus formula)");
 assert(sanitizeForSheet("-10*5") === "'-10*5", "Neutralize - (minus formula)");
@@ -30,7 +33,7 @@ assert(sanitizeForSheet("NeuralVision: Edge AI") === "NeuralVision: Edge AI", "S
 assert(unescapeFromSheet("'-10*5") === "-10*5", "Unescape formula escape character");
 
 // 2. SSRF Protection & GitHub URL Validator
-console.log("\n[2/4] Testing SSRF Guard & GitHub URL Validator (§6.6)...");
+console.log("\n[2/5] Testing SSRF Guard & GitHub URL Validator (§6.6)...");
 const validGh = parseAndValidateGitHubUrl("https://github.com/facebook/react");
 assert(validGh.isValid && validGh.owner === "facebook" && validGh.repo === "react", "Accept valid GitHub URL");
 
@@ -47,7 +50,7 @@ const traversalAttack = parseAndValidateGitHubUrl("https://github.com/../etc/pas
 assert(!traversalAttack.isValid, "Reject directory traversal");
 
 // 3. Image Magic Bytes Verification
-console.log("\n[3/4] Testing Image Magic Byte Verification (§6.7)...");
+console.log("\n[3/5] Testing Image Magic Byte Verification (§6.7)...");
 const jpegHeader = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01]);
 assert(validateImageMagicBytes(jpegHeader).isValid && validateImageMagicBytes(jpegHeader).format === "jpeg", "Verify JPEG magic bytes");
 
@@ -58,7 +61,7 @@ const fakePayload = Buffer.from("<!DOCTYPE html><html><body>malicious script</bo
 assert(!validateImageMagicBytes(fakePayload).isValid, "Reject text/html masquerading as image");
 
 // 4. Faculty Normalization & SHA-256 Hashing Stability
-console.log("\n[4/4] Testing Faculty Normalization & SHA-256 Hashing Stability (§4.5)...");
+console.log("\n[4/5] Testing Faculty Normalization & SHA-256 Hashing Stability (§4.5)...");
 const rawList1 = [
   { name: "dr. abdul waheed ", subjects: "Software Engineering, Foreign Language", sections: "BSSE-6B, BSSE-6A" },
   { name: "DR. ARFAN ALI NAGRA", subjects: "Generative AI, Discrete Structures", sections: "BSAI-2B, BSAI-2C" }
@@ -75,6 +78,86 @@ const hash2 = computeHash(norm2);
 
 assert(hash1 === hash2, "Deterministic SHA-256 hashing across reordered names and subjects");
 assert(norm1[0].name === "DR. ABDUL WAHEED" && norm1[0].subjects === "Foreign Language, Software Engineering", "Alphabetical sorting of faculty and subjects");
+
+// 5. Video & Google Drive Embed Normalization
+console.log("\n[5/5] Testing Video & Google Drive Embed Normalization...");
+const ytWatch = normalizeVideoEmbedUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+assert(ytWatch === "https://www.youtube.com/embed/dQw4w9WgXcQ", "Convert YouTube watch URL to embed");
+
+const ytShort = normalizeVideoEmbedUrl("https://youtu.be/dQw4w9WgXcQ?t=10");
+assert(ytShort === "https://www.youtube.com/embed/dQw4w9WgXcQ", "Convert youtu.be short URL to embed");
+
+const gDriveView = normalizeVideoEmbedUrl("https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?usp=sharing");
+assert(gDriveView === "https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/preview", "Convert Google Drive view to /preview embed");
+
+const loomLink = normalizeVideoEmbedUrl("https://www.loom.com/share/abc123def456");
+assert(loomLink === "https://www.loom.com/embed/abc123def456", "Convert Loom share link to /embed");
+
+const submissionTest = ProjectSubmissionSchema.safeParse({
+  roll_number: "BSAI-F22-099",
+  student_name: "Zainab Fatima",
+  project_title: "MedVision: Retinal Diagnostics",
+  description: "Deep convolutional architecture for diabetic retinopathy detection and clinical triage.",
+  tech_stack: "Python, PyTorch, React, FastAPI",
+  github_url: "https://github.com/facebook/react",
+  batch_section: "BSAI-4A",
+  subject: "Computer Vision",
+  supervisor_name: "Dr. Hafiz Muhammad Tayyab Khushi",
+  video_url: "https://youtu.be/dQw4w9WgXcQ",
+});
+assert(submissionTest.success, "ProjectSubmissionSchema accepts valid video_url and BSAI-4A section");
+
+// 6. Roll Number Smart Parser
+console.log("\n[6/7] Testing Superior University Roll Number Smart Parser...");
+
+const parsed1 = parseSuperiorRollNumber("SU92-BSAIM-F24-042");
+assert(parsed1.isValid && parsed1.degree === "BSAI" && parsed1.shift === "Morning" && parsed1.batchYear === "Fall 2024", "Parse SU92-BSAIM-F24-042 correctly");
+
+const parsed2 = parseSuperiorRollNumber("BSAI-F21-042");
+assert(parsed2.isValid && parsed2.degree === "BSAI" && parsed2.batchYear === "Fall 2021", "Parse legacy BSAI-F21-042 correctly");
+
+const parsed3 = parseSuperiorRollNumber("SU92-BSSEE-F23-112");
+assert(parsed3.isValid && parsed3.degree === "BSSE" && parsed3.shift === "Evening" && parsed3.batchYear === "Fall 2023", "Parse Evening shift roll number SU92-BSSEE-F23-112");
+
+// 7. Repository Similarity & Plagiarism Detector
+console.log("\n[7/7] Testing Automated Repository Similarity & Plagiarism Detector...");
+
+const canonical1 = normalizeRepoUrl("https://github.com/facebook/react.git/");
+const canonical2 = normalizeRepoUrl("http://github.com/FACEBOOK/React");
+assert(canonical1 === canonical2 && canonical1 === "github.com/facebook/react", "Normalize GitHub URLs to canonical owner/repo identifier");
+
+const mockExistingProjects: any[] = [
+  {
+    id: "proj-1",
+    github_url: "https://github.com/superior/agent-swarm",
+    project_title: "Autonomous Research Agent Swarm",
+    description: "Multi-agent collaborative framework for deep academic exploration.",
+    tech_stack: "Python, FastAPI, LangChain, React",
+    roll_number: "SU92-BSAIM-F24-054",
+  },
+];
+
+const duplicateCheck = evaluateProjectSimilarity(
+  {
+    github_url: "https://github.com/superior/agent-swarm.git",
+    project_title: "AI Research Swarm Copy",
+    description: "Another multi-agent project",
+    tech_stack: "Python, React",
+  },
+  mockExistingProjects
+);
+assert(duplicateCheck.flag === "duplicate" && duplicateCheck.exactUrlMatch === true, "Detect exact duplicate repository URL match");
+
+const uniqueCheck = evaluateProjectSimilarity(
+  {
+    github_url: "https://github.com/student/quantum-cryptex",
+    project_title: "Quantum Cryptex Security Engine",
+    description: "Post-quantum cryptographic key exchange protocol using lattice cryptography.",
+    tech_stack: "Rust, WebAssembly, TypeScript",
+  },
+  mockExistingProjects
+);
+assert(uniqueCheck.flag === "unique" && uniqueCheck.score < 25, "Verify unique original project submission");
 
 console.log("\n=================================================");
 console.log(`  RESULTS: ${passed} PASSED, ${failed} FAILED`);

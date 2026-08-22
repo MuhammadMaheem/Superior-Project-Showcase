@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { TrafficTracker } from "@/components/TrafficTracker";
 import "./globals.css";
 import "driver.js/dist/driver.css";
 
@@ -82,7 +85,10 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col bg-[#0a0f1d] text-[#f8fafc] font-sans antialiased selection:bg-blue-600 selection:text-white">
+        <TrafficTracker />
         {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

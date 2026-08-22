@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Sparkles, PlusCircle, Award, Code, Users, BookOpen, Layers } from "lucide-react";
+import { Sparkles, PlusCircle, Award, Code, Users, BookOpen, Layers, RefreshCw } from "lucide-react";
 import { BentoGrid } from "./BentoGrid";
 import { FilterBar, type FilterState } from "./FilterBar";
 import type { Project, Teacher } from "@/lib/sheets/models";
@@ -13,6 +13,9 @@ interface PublicShowcaseClientProps {
 }
 
 export function PublicShowcaseClient({ initialProjects, teachers }: PublicShowcaseClientProps) {
+  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
   const [filters, setFilters] = useState<FilterState>({
     search: "",
     batch: "All Batches",
@@ -21,10 +24,40 @@ export function PublicShowcaseClient({ initialProjects, teachers }: PublicShowca
     supervisor: "All Supervisors",
   });
 
+  // Sync if initialProjects prop updates
+  useEffect(() => {
+    setProjects(initialProjects);
+  }, [initialProjects]);
+
+  // Live real-time sync with API on mount and on visibility change
+  const refreshProjects = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      const res = await fetch("/api/projects", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.projects)) {
+          setProjects(data.projects);
+        }
+      }
+    } catch (err) {
+      console.warn("[Showcase] Live project sync note:", err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshProjects();
+    const handleFocus = () => refreshProjects();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [refreshProjects]);
+
   // Extract distinct tech stack tags from all projects
   const availableTechStacks = useMemo(() => {
     const set = new Set<string>();
-    for (const p of initialProjects) {
+    for (const p of projects) {
       if (p.tech_stack) {
         p.tech_stack.split(",").forEach((t) => {
           const trimmed = t.trim();
@@ -35,34 +68,34 @@ export function PublicShowcaseClient({ initialProjects, teachers }: PublicShowca
       }
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [initialProjects]);
+  }, [projects]);
 
   // Extract distinct batch tags from all projects
   const availableBatches = useMemo(() => {
     const set = new Set<string>();
-    for (const p of initialProjects) {
+    for (const p of projects) {
       if (p.batch_section) {
         set.add(p.batch_section.trim());
       }
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [initialProjects]);
+  }, [projects]);
 
   // Extract distinct supervisor names (combining faculty directory & custom self-written supervisors)
   const availableSupervisors = useMemo(() => {
     const set = new Set<string>();
     teachers.forEach((t) => set.add(t.name));
-    initialProjects.forEach((p) => {
+    projects.forEach((p) => {
       if (p.supervisor_name && p.supervisor_name.trim()) {
         set.add(p.supervisor_name.trim());
       }
     });
     return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [teachers, initialProjects]);
+  }, [teachers, projects]);
 
   // Client-side instant multi-facet filter
   const filteredProjects = useMemo(() => {
-    return initialProjects.filter((project) => {
+    return projects.filter((project) => {
       // 1. Search Query
       if (filters.search) {
         const query = filters.search.toLowerCase();
@@ -107,7 +140,7 @@ export function PublicShowcaseClient({ initialProjects, teachers }: PublicShowca
 
       return true;
     });
-  }, [initialProjects, filters]);
+  }, [projects, filters]);
 
   const handleResetFilters = () => {
     setFilters({
@@ -167,7 +200,7 @@ export function PublicShowcaseClient({ initialProjects, teachers }: PublicShowca
                 <Award className="h-4 w-4" />
                 <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Projects</span>
               </div>
-              <p className="font-display text-2xl font-bold text-white">{initialProjects.length}</p>
+              <p className="font-display text-2xl font-bold text-white">{projects.length}</p>
             </div>
 
             <div className="rounded-2xl border border-[#1f293d] bg-[#111827]/50 p-4">

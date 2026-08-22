@@ -3,6 +3,8 @@ import path from "path";
 import crypto from "crypto";
 import { getGoogleSheetsClient, getSpreadsheetId } from "./client";
 import { sanitizeForSheet, unescapeFromSheet } from "./sanitize";
+import { isFirebaseConfigured } from "../firebase/client";
+import { firebaseAdapter } from "../firebase/adapter";
 import type {
   Project,
   Teacher,
@@ -179,6 +181,14 @@ export const dataAdapter = {
   // PROJECTS
   // --------------------------------------------------
   async getProjects(filter?: { publishedOnly?: boolean }): Promise<Project[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getProjects(filter);
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getProjects failed, trying fallback:", err);
+      }
+    }
+
     const sheets = getGoogleSheetsClient();
     const spreadsheetId = getSpreadsheetId();
 
@@ -231,11 +241,30 @@ export const dataAdapter = {
   },
 
   async getProjectById(id: string): Promise<Project | null> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getProjectById(id);
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getProjectById failed, trying fallback:", err);
+      }
+    }
     const projects = await this.getProjects();
     return projects.find((p) => p.id === id) || null;
   },
 
   async createProject(projectData: Omit<Project, "id" | "submitted_at" | "updated_at">): Promise<Project> {
+    if (isFirebaseConfigured()) {
+      try {
+        const created = await firebaseAdapter.createProject(projectData);
+        const db = ensureLocalDb();
+        db.projects = [created, ...db.projects.filter((p) => p.id !== created.id)];
+        saveLocalDb(db);
+        return created;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase createProject failed, trying fallback:", err);
+      }
+    }
+
     const now = new Date().toISOString();
     const newProject: Project = {
       ...projectData,
@@ -293,6 +322,23 @@ export const dataAdapter = {
   },
 
   async updateProject(id: string, updates: Partial<Project>): Promise<Project | null> {
+    if (isFirebaseConfigured()) {
+      try {
+        const updated = await firebaseAdapter.updateProject(id, updates);
+        if (updated) {
+          const db = ensureLocalDb();
+          const idx = db.projects.findIndex((p) => p.id === id);
+          if (idx !== -1) {
+            db.projects[idx] = updated;
+            saveLocalDb(db);
+          }
+        }
+        return updated;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase updateProject failed, trying fallback:", err);
+      }
+    }
+
     const now = new Date().toISOString();
     const db = ensureLocalDb();
     const idx = db.projects.findIndex((p) => p.id === id);
@@ -358,6 +404,18 @@ export const dataAdapter = {
   },
 
   async deleteProject(id: string): Promise<boolean> {
+    if (isFirebaseConfigured()) {
+      try {
+        const deleted = await firebaseAdapter.deleteProject(id);
+        const db = ensureLocalDb();
+        db.projects = db.projects.filter((p) => p.id !== id);
+        saveLocalDb(db);
+        return deleted;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase deleteProject failed, trying fallback:", err);
+      }
+    }
+
     const db = ensureLocalDb();
     const initialLen = db.projects.length;
     db.projects = db.projects.filter((p) => p.id !== id);
@@ -369,6 +427,14 @@ export const dataAdapter = {
   // TEACHERS (Live approved data)
   // --------------------------------------------------
   async getTeachers(): Promise<Teacher[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getTeachers();
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getTeachers failed, trying fallback:", err);
+      }
+    }
+
     const sheets = getGoogleSheetsClient();
     const spreadsheetId = getSpreadsheetId();
 
@@ -409,6 +475,15 @@ export const dataAdapter = {
   },
 
   async setTeachers(teachers: Teacher[]): Promise<void> {
+    if (isFirebaseConfigured()) {
+      try {
+        await firebaseAdapter.setTeachers(teachers);
+        return;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase setTeachers failed, trying fallback:", err);
+      }
+    }
+
     const db = ensureLocalDb();
     db.teachers = teachers;
     saveLocalDb(db);
@@ -459,17 +534,39 @@ export const dataAdapter = {
   // TEACHERS PENDING (Sync staging queue)
   // --------------------------------------------------
   async getTeachersPending(): Promise<TeacherPending[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getTeachersPending();
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getTeachersPending failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     return db.teachers_pending;
   },
 
   async setTeachersPending(pending: TeacherPending[]): Promise<void> {
+    if (isFirebaseConfigured()) {
+      try {
+        await firebaseAdapter.setTeachersPending(pending);
+        return;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase setTeachersPending failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     db.teachers_pending = pending;
     saveLocalDb(db);
   },
 
   async updatePendingTeacher(slug: string, updates: Partial<TeacherPending>): Promise<TeacherPending | null> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.updatePendingTeacher(slug, updates);
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase updatePendingTeacher failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     const idx = db.teachers_pending.findIndex((t) => t.slug === slug);
     if (idx === -1) return null;
@@ -482,11 +579,26 @@ export const dataAdapter = {
   // SYNC META & LOGS
   // --------------------------------------------------
   async getSyncMeta(): Promise<TeacherSyncMeta> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getSyncMeta();
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getSyncMeta failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     return db.sync_meta;
   },
 
   async updateSyncMeta(meta: Partial<TeacherSyncMeta>): Promise<TeacherSyncMeta> {
+    if (isFirebaseConfigured()) {
+      try {
+        await firebaseAdapter.updateSyncMeta(meta);
+        return await firebaseAdapter.getSyncMeta();
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase updateSyncMeta failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     db.sync_meta = { ...db.sync_meta, ...meta };
     saveLocalDb(db);
@@ -494,17 +606,40 @@ export const dataAdapter = {
   },
 
   async getSyncLogs(): Promise<TeacherSyncLog[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getSyncLogs();
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getSyncLogs failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     return db.sync_logs;
   },
 
   async appendSyncLogs(logs: TeacherSyncLog[]): Promise<void> {
+    if (isFirebaseConfigured()) {
+      try {
+        await firebaseAdapter.appendSyncLogs(logs);
+        return;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase appendSyncLogs failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     db.sync_logs.unshift(...logs);
     saveLocalDb(db);
   },
 
   async updateSyncLogResolution(syncId: string, resolution: "approved" | "rejected"): Promise<void> {
+    if (isFirebaseConfigured()) {
+      try {
+        await firebaseAdapter.updateSyncLogResolution(syncId, resolution);
+        return;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase updateSyncLogResolution failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     db.sync_logs = db.sync_logs.map((log) =>
       log.sync_id === syncId ? { ...log, resolution } : log
@@ -516,6 +651,14 @@ export const dataAdapter = {
   // QUERIES
   // --------------------------------------------------
   async getQueries(): Promise<QueryMessage[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getQueries();
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getQueries failed, trying fallback:", err);
+      }
+    }
+
     const sheets = getGoogleSheetsClient();
     const spreadsheetId = getSpreadsheetId();
 
@@ -554,6 +697,14 @@ export const dataAdapter = {
   },
 
   async createQuery(queryData: Omit<QueryMessage, "id" | "submitted_at" | "status">): Promise<QueryMessage> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.createQuery(queryData);
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase createQuery failed, trying fallback:", err);
+      }
+    }
+
     const newQuery: QueryMessage = {
       ...queryData,
       id: crypto.randomUUID(),
@@ -595,6 +746,14 @@ export const dataAdapter = {
   },
 
   async respondToQuery(id: string, adminResponse: string, status: "open" | "resolved" = "resolved"): Promise<QueryMessage | null> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.respondToQuery(id, adminResponse, status);
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase respondToQuery failed, trying fallback:", err);
+      }
+    }
+
     const db = ensureLocalDb();
     const idx = db.queries.findIndex((q) => q.id === id);
     if (idx === -1) return null;
@@ -650,11 +809,27 @@ export const dataAdapter = {
   // AUDIT LOGS
   // --------------------------------------------------
   async getAuditLogs(): Promise<AdminAuditLog[]> {
+    if (isFirebaseConfigured()) {
+      try {
+        return await firebaseAdapter.getAuditLogs();
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase getAuditLogs failed, trying fallback:", err);
+      }
+    }
     const db = ensureLocalDb();
     return db.audit_logs || [];
   },
 
   async logAdminAction(action: string, targetType: string, targetId: string, details: string): Promise<void> {
+    if (isFirebaseConfigured()) {
+      try {
+        await firebaseAdapter.logAdminAction(action, targetType, targetId, details);
+        return;
+      } catch (err) {
+        console.warn("[DataAdapter] Firebase logAdminAction failed, trying fallback:", err);
+      }
+    }
+
     const log: AdminAuditLog = {
       id: crypto.randomUUID(),
       timestamp: new Date().toISOString(),

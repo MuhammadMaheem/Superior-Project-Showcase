@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -13,11 +13,15 @@ import {
   BookOpen,
   Edit3,
   Sparkles,
+  Play,
+  Layers,
+  Film,
 } from "lucide-react";
 import { GithubIcon, LinkedinIcon } from "@/components/Icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageSlideshow } from "./ImageSlideshow";
 import type { Project } from "@/lib/sheets/models";
+import { normalizeVideoEmbedUrl } from "@/lib/sheets/models";
 import { formatDate } from "@/lib/utils";
 
 interface ProjectModalProps {
@@ -27,6 +31,17 @@ interface ProjectModalProps {
 }
 
 export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
+  const [activeMediaTab, setActiveMediaTab] = useState<"screenshots" | "video">("screenshots");
+
+  // Reset tab when project changes
+  useEffect(() => {
+    if (project?.video_url && !project.screenshot_1 && !project.screenshot_2) {
+      setActiveMediaTab("video");
+    } else {
+      setActiveMediaTab("screenshots");
+    }
+  }, [project]);
+
   // Handle ESC key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,6 +72,8 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
     project.screenshot_3,
     project.screenshot_4,
   ].filter(Boolean) as string[];
+
+  const embedVideoUrl = normalizeVideoEmbedUrl(project.video_url);
 
   return (
     <AnimatePresence>
@@ -98,6 +115,11 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
                 <span className="rounded bg-emerald-500/10 px-2.5 py-0.5 text-xs font-mono font-semibold text-emerald-400 border border-emerald-500/20">
                   Verified Capstone
                 </span>
+                {project.video_url && (
+                  <span className="rounded bg-red-500/10 px-2.5 py-0.5 text-xs font-mono font-semibold text-red-400 border border-red-500/20 flex items-center gap-1">
+                    <Play className="h-3 w-3 fill-current" /> Demo Video Available
+                  </span>
+                )}
               </div>
               <h2 className="font-display text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
                 {project.project_title}
@@ -116,9 +138,52 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
               ))}
             </div>
 
-            {/* 3. Image Slideshow */}
-            <div className="py-2">
-              <ImageSlideshow images={screenshots} title={project.project_title} />
+            {/* 3. Media Viewer: Screenshots vs Video Tab Switcher */}
+            <div className="space-y-3 py-2">
+              {project.video_url && screenshots.length > 0 && (
+                <div className="flex items-center gap-2 border-b border-[#1f293d] pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaTab("screenshots")}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+                      activeMediaTab === "screenshots"
+                        ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                        : "bg-[#1e293b] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    <span>Screenshots ({screenshots.length})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveMediaTab("video")}
+                    className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all ${
+                      activeMediaTab === "video"
+                        ? "bg-red-600 text-white shadow-md shadow-red-500/20"
+                        : "bg-[#1e293b] text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    <Film className="h-3.5 w-3.5" />
+                    <span>Watch Video Demo</span>
+                  </button>
+                </div>
+              )}
+
+              {/* View Content */}
+              {activeMediaTab === "video" && embedVideoUrl ? (
+                <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-[#1f293d] bg-black shadow-inner">
+                  <iframe
+                    src={embedVideoUrl}
+                    title="Project Demo Video"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    className="h-full w-full border-0"
+                  />
+                </div>
+              ) : (
+                <ImageSlideshow images={screenshots} title={project.project_title} />
+              )}
             </div>
 
             {/* 4. Description */}
@@ -154,6 +219,16 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
                   <ExternalLink className="h-4 w-4" />
                   <span>Launch Live Demo</span>
                 </a>
+              )}
+              {project.video_url && (
+                <button
+                  type="button"
+                  onClick={() => setActiveMediaTab("video")}
+                  className="flex items-center gap-2 rounded-xl bg-red-600/20 text-red-300 border border-red-500/30 px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all hover:bg-red-600/30 hover:text-white"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                  <span>Play Video Demo</span>
+                </button>
               )}
               {project.linkedin_url && (
                 <a

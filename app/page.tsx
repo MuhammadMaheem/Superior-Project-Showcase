@@ -3,6 +3,8 @@ import { Footer } from "@/components/Footer";
 import { PublicShowcaseClient } from "@/components/PublicShowcaseClient";
 import { dataAdapter } from "@/lib/sheets/adapter";
 
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 export const revalidate = 0; // Dynamic data fetch
 
 export default async function HomePage() {

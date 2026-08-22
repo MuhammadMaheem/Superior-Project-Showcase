@@ -10,6 +10,7 @@ export interface Project {
   tech_stack: string; // Comma-separated in sheet, parsed to string[] when needed
   github_url: string;
   live_url?: string;
+  video_url?: string; // YouTube, Google Drive, Loom, Vimeo or direct video link
   linkedin_url?: string;
   email?: string;
   batch_section: string;
@@ -86,6 +87,76 @@ export interface AdminAuditLog {
   details: string;
 }
 
+export interface VisitorEvent {
+  id: string;
+  timestamp: string;
+  path: string;
+  projectId?: string;
+  projectTitle?: string;
+  referrer?: string;
+  device?: "desktop" | "mobile" | "tablet";
+  ipHash?: string;
+}
+
+export interface TrafficStats {
+  totalPageviews: number;
+  uniqueVisitors: number;
+  activeVisitorsNow: number;
+  topProjects: {
+    id: string;
+    title: string;
+    rollNumber: string;
+    views: number;
+  }[];
+  referrers: { source: string; count: number; percentage: number }[];
+  deviceBreakdown: { desktop: number; mobile: number };
+  dailyViews: { date: string; views: number }[];
+  recentEvents: VisitorEvent[];
+}
+
+/**
+ * Normalizes video links (YouTube, Google Drive, Loom, Vimeo) to their embeddable preview URLs
+ */
+export function normalizeVideoEmbedUrl(url?: string): string | undefined {
+  if (!url || typeof url !== "string") return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+
+  // 1. YouTube watch or short links
+  // e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ or https://youtu.be/dQw4w9WgXcQ
+  const ytWatchMatch = trimmed.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i);
+  if (ytWatchMatch && ytWatchMatch[1]) {
+    return `https://www.youtube.com/embed/${ytWatchMatch[1]}`;
+  }
+
+  // 2. Google Drive preview links
+  // e.g. https://drive.google.com/file/d/1a2b3c4d5e/view?usp=sharing
+  const gDriveMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/i);
+  if (gDriveMatch && gDriveMatch[1]) {
+    return `https://drive.google.com/file/d/${gDriveMatch[1]}/preview`;
+  }
+  const gDriveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/i);
+  if (gDriveOpenMatch && gDriveOpenMatch[1]) {
+    return `https://drive.google.com/file/d/${gDriveOpenMatch[1]}/preview`;
+  }
+
+  // 3. Loom video links
+  // e.g. https://www.loom.com/share/abcdef123456
+  const loomMatch = trimmed.match(/loom\.com\/share\/([a-zA-Z0-9_-]+)/i);
+  if (loomMatch && loomMatch[1]) {
+    return `https://www.loom.com/embed/${loomMatch[1]}`;
+  }
+
+  // 4. Vimeo video links
+  // e.g. https://vimeo.com/123456789
+  const vimeoMatch = trimmed.match(/vimeo\.com\/(\d+)/i);
+  if (vimeoMatch && vimeoMatch[1]) {
+    return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
+  }
+
+  return trimmed;
+}
+
 // Zod Schemas for Public Forms & Server Validation
 export const ProjectSubmissionSchema = z.object({
   roll_number: z
@@ -120,6 +191,11 @@ export const ProjectSubmissionSchema = z.object({
   live_url: z
     .string()
     .url("Invalid Live URL")
+    .optional()
+    .or(z.literal("")),
+  video_url: z
+    .string()
+    .url("Invalid Video / Google Drive URL")
     .optional()
     .or(z.literal("")),
   linkedin_url: z

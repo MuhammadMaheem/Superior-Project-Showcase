@@ -55,12 +55,18 @@ export async function POST(request: NextRequest) {
       headers.Authorization = `token ${token}`;
     }
 
-    // Parallel fetch: Repo details, Languages, and Owner Profile
+    // Parallel fetch: Repo details, Languages, and Owner Profile with 4s timeout
+    const fetchOptions = {
+      headers,
+      signal: AbortSignal.timeout(4000),
+      next: { revalidate: 60 },
+    };
+
     const [repoRes, langRes, userRes, readmeRes] = await Promise.allSettled([
-      fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers, next: { revalidate: 60 } }),
-      fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, { headers, next: { revalidate: 60 } }),
-      fetch(`https://api.github.com/users/${owner}`, { headers, next: { revalidate: 60 } }),
-      fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, { headers, next: { revalidate: 60 } }),
+      fetch(`https://api.github.com/repos/${owner}/${repo}`, fetchOptions),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/languages`, fetchOptions),
+      fetch(`https://api.github.com/users/${owner}`, fetchOptions),
+      fetch(`https://api.github.com/repos/${owner}/${repo}/readme`, fetchOptions),
     ]);
 
     // Check if repo lookup succeeded
@@ -104,35 +110,93 @@ export async function POST(request: NextRequest) {
     // Parse topics
     const topics: string[] = repoData.topics || [];
 
-    // Combine languages and topics for tech stack tags
-    const combinedTags = Array.from(new Set([...languagesList, ...topics])).filter(Boolean);
-    const techStackString = combinedTags.length > 0 ? combinedTags.slice(0, 8).join(", ") : repoData.language || "TypeScript, React";
-
-    // Parse readme excerpt
+    // Parse readme title & excerpt
+    let readmeTitle = "";
     let readmeExcerpt = "";
+
     if (readmeRes.status === "fulfilled" && readmeRes.value.ok) {
       try {
         const readmeData = await readmeRes.value.json();
         if (readmeData.content && readmeData.encoding === "base64") {
-          const decoded = Buffer.from(readmeData.content, "base64").toString("utf8");
-          // Extract first 400 chars of meaningful text without markdown headers
-          const cleanText = decoded
-            .replace(/#+\s+.*?\n/g, "")
-            .replace(/!\[.*?\]\(.*?\)/g, "")
-            .replace(/\[.*?\]\(.*?\)/g, "$1")
-            .replace(/`{1,3}.*?`{1,3}/g, "")
+          const rawReadme = Buffer.from(readmeData.content, "base64").toString("utf8");
+
+          // Extract first H1 header for accurate project title
+          const h1Match = rawReadme.match(/^#\s+(.+)$/m);
+          if (h1Match) {
+            readmeTitle = h1Match[1]
+              .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, "") // strip emojis
+              .replace(/`{1,3}.*?`{1,3}/g, "")
+              .replace(/\[(.*?)\]\(.*?\)/g, "$1")
+              .trim();
+          }
+
+          // Clean Markdown body
+          const cleanBody = rawReadme
+            .replace(/\[!\[.*?\]\(.*?\)\]\(.*?\)/g, "") // nested badge links
+            .replace(/!\[.*?\]\(.*?\)/g, "")            // image tags
+            .replace(/\[(.*?)\]\(.*?\)/g, "$1")          // regular markdown links
+            .replace(/<[^>]+>/g, "")                    // html tags
+            .replace(/```[\s\S]*?```/g, "")             // code blocks
+            .replace(/`.*?`/g, "")                      // inline code
             .trim();
-          readmeExcerpt = cleanText.slice(0, 300) + (cleanText.length > 300 ? "..." : "");
+
+          // Split into paragraphs and pick the first substantive text block
+          const paragraphs = cleanBody
+            .split(/\n\s*\n/)
+            .map((p) => p.replace(/^#+.*$/gm, "").trim())
+            .filter(
+              (p) =>
+                p.length > 30 &&
+                !p.startsWith("-") &&
+                !p.startsWith("*") &&
+                !p.toLowerCase().includes("table of contents")
+            );
+
+          if (paragraphs.length > 0) {
+            const rawParagraph = paragraphs[0].replace(/\s+/g, " ");
+            readmeExcerpt =
+              rawParagraph.slice(0, 320) + (rawParagraph.length > 320 ? "..." : "");
+          }
         }
       } catch {
         // Ignore readme decode errors
       }
     }
 
-    // Format human-friendly title if description exists
-    const projectTitle = repoData.name
-      ? repoData.name.replace(/[-_]/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
-      : repo;
+    // Format human-friendly title
+    const formattedRepoName = repo
+      .replace(/[-_]/g, " ")
+      .replace(/\b\w/g, (l: string) => l.toUpperCase());
+
+    const projectTitle = readmeTitle || repoData.name ? (readmeTitle || formattedRepoName) : repo;
+
+    // Detect frameworks & libraries from README if found
+    const detectedExtraTech: string[] = [];
+    if (readmeExcerpt) {
+      const lowerExcerpt = readmeExcerpt.toLowerCase();
+      if (lowerExcerpt.includes("pytorch") && !topics.includes("pytorch")) detectedExtraTech.push("PyTorch");
+      if (lowerExcerpt.includes("tensorflow") && !topics.includes("tensorflow")) detectedExtraTech.push("TensorFlow");
+      if (lowerExcerpt.includes("flask") && !topics.includes("flask")) detectedExtraTech.push("Flask");
+      if (lowerExcerpt.includes("fastapi") && !topics.includes("fastapi")) detectedExtraTech.push("FastAPI");
+      if (lowerExcerpt.includes("next.js") || lowerExcerpt.includes("nextjs")) detectedExtraTech.push("Next.js");
+      if (lowerExcerpt.includes("dqn") || lowerExcerpt.includes("deep q")) detectedExtraTech.push("Deep Q-Learning (DQN)");
+    }
+
+    // Combine languages, topics, and detected frameworks
+    const combinedTags = Array.from(
+      new Set([...languagesList, ...topics, ...detectedExtraTech])
+    ).filter(Boolean);
+
+    const techStackString =
+      combinedTags.length > 0
+        ? combinedTags.slice(0, 8).join(", ")
+        : repoData.language || "TypeScript, React";
+
+    // Build final authentic description
+    const finalDescription =
+      repoData.description ||
+      readmeExcerpt ||
+      `An advanced engineering capstone project developed by ${studentName || owner}.`;
 
     const responseData: GitHubEnrichResponse = {
       success: true,
@@ -141,7 +205,7 @@ export async function POST(request: NextRequest) {
       student_name: studentName,
       student_avatar_url: avatarUrl,
       project_title: projectTitle,
-      description: repoData.description || readmeExcerpt || `A capstone engineering project built by ${owner}.`,
+      description: finalDescription,
       tech_stack: techStackString,
       languages: languagesList,
       topics,

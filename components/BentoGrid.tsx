@@ -18,6 +18,26 @@ export function BentoGrid({ projects }: BentoGridProps) {
   const handleOpenModal = (project: Project) => {
     setSelectedProject(project);
     setIsModalOpen(true);
+
+    try {
+      const payload = JSON.stringify({
+        path: `/#project-${project.id}`,
+        projectId: project.id,
+        projectTitle: project.project_title,
+        referrer: typeof document !== "undefined" ? document.referrer : "",
+      });
+      if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+        navigator.sendBeacon("/api/analytics/track", payload);
+      } else {
+        fetch("/api/analytics/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+        }).catch(() => {});
+      }
+    } catch {
+      // Ignore tracking errors
+    }
   };
 
   const handleCloseModal = () => {

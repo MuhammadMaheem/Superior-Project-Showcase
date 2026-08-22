@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowUpRight, Code, Terminal, Layers } from "lucide-react";
+import { ArrowUpRight, Code, Terminal, Layers, Play } from "lucide-react";
 import { GithubIcon } from "@/components/Icons";
 import type { Project } from "@/lib/sheets/models";
 
@@ -60,6 +60,13 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-[#111827] via-transparent to-transparent opacity-60 pointer-events-none" />
           
+          {/* Video Indicator Pill */}
+          {project.video_url && (
+            <div className="absolute top-2.5 right-2.5 flex items-center gap-1 rounded-full bg-red-600/90 px-2 py-0.5 text-[9px] font-mono font-semibold text-white shadow-md shadow-red-950/50 backdrop-blur-md">
+              <Play className="h-2.5 w-2.5 fill-current" /> Video
+            </div>
+          )}
+
           {/* Batch Badge Overlay */}
           <div className="absolute bottom-2.5 left-2.5 rounded-full bg-[#111827]/90 px-2.5 py-0.5 text-[10px] font-mono font-medium text-blue-300 border border-blue-500/30 backdrop-blur-md">
             {project.batch_section}
