@@ -11,9 +11,6 @@ export { DEFAULT_TEACHER_PERMISSIONS, SUPER_ADMIN_PERMISSIONS };
 
 const COLLECTION_NAME = "teacher_accounts";
 
-// In-memory fallback if Firestore is not configured
-let localTeacherAccounts: TeacherAccount[] = [];
-
 /**
  * Hashes a plaintext password using salt + PBKDF2
  */
@@ -37,6 +34,50 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   }
 }
 
+// Pre-seeded demo faculty accounts for easy 1-click testing
+let localTeacherAccounts: TeacherAccount[] = [
+  {
+    id: "usr-teacher-ahmed-demo",
+    email: "dr.ahmed.bilal@superior.edu.pk",
+    name: "Dr. Ahmed Bilal",
+    designation: "Associate Professor & FYP Evaluator",
+    password_hash: hashPassword("Password123!"),
+    is_active: true,
+    role: "TEACHER",
+    permissions: {
+      can_view_all_projects: true,
+      can_edit_projects: true,
+      can_delete_projects: false,
+      can_send_inquiries: true,
+      can_escalate_faculty: true,
+      can_manage_queries: false,
+      can_view_telemetry: true,
+    },
+    assigned_subjects: ["Deep Learning", "Machine Learning"],
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: "usr-teacher-sarah-demo",
+    email: "sarah.khan@superior.edu.pk",
+    name: "Dr. Sarah Khan",
+    designation: "Assistant Professor (AI/ML)",
+    password_hash: hashPassword("Password123!"),
+    is_active: true,
+    role: "TEACHER",
+    permissions: {
+      can_view_all_projects: false,
+      can_edit_projects: false,
+      can_delete_projects: false,
+      can_send_inquiries: true,
+      can_escalate_faculty: false,
+      can_manage_queries: false,
+      can_view_telemetry: false,
+    },
+    assigned_subjects: ["Computer Networks", "Information Security"],
+    created_at: new Date().toISOString(),
+  },
+];
+
 /**
  * Generates a random secure temporary password
  */
@@ -57,7 +98,9 @@ export async function getTeacherAccounts(): Promise<TeacherAccount[]> {
   if (db) {
     try {
       const snap = await db.collection(COLLECTION_NAME).orderBy("created_at", "desc").get();
-      return snap.docs.map((doc) => doc.data() as TeacherAccount);
+      if (!snap.empty) {
+        return snap.docs.map((doc) => doc.data() as TeacherAccount);
+      }
     } catch (err) {
       console.warn("[Accounts] Error fetching from Firestore, using fallback:", err);
     }
@@ -77,7 +120,6 @@ export async function getTeacherAccountByEmail(email: string): Promise<TeacherAc
       if (!snap.empty) {
         return snap.docs[0].data() as TeacherAccount;
       }
-      return null;
     } catch (err) {
       console.warn("[Accounts] Error fetching by email from Firestore:", err);
     }

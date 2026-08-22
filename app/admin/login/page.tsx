@@ -200,6 +200,66 @@ function LoginForm() {
         </button>
       </form>
 
+      {/* 🧪 1-Click Auto-Fill for Testing */}
+      <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-3.5 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-mono font-bold text-blue-400 flex items-center gap-1.5">
+            <span>🧪</span> Testing Auto-Fill
+          </span>
+          <span className="text-[10px] font-mono text-slate-500">1-Click Test Login</span>
+        </div>
+
+        {tab === "admin" ? (
+          <button
+            type="button"
+            onClick={() => {
+              setPassword("SuperiorAdmin2026!");
+              setError(null);
+            }}
+            className="w-full flex items-center justify-between rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-3 py-2 text-xs font-mono text-slate-300 hover:border-blue-500 hover:text-white transition-all cursor-pointer"
+          >
+            <span className="flex items-center gap-1.5 text-amber-400 font-semibold">
+              <Crown className="h-3.5 w-3.5" /> Super Admin
+            </span>
+            <span className="text-[10px] text-slate-500 truncate">SuperiorAdmin2026!</span>
+          </button>
+        ) : (
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("dr.ahmed.bilal@superior.edu.pk");
+                setPassword("Password123!");
+                setError(null);
+              }}
+              className="w-full flex items-center justify-between rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-3 py-2 text-xs font-mono text-slate-300 hover:border-blue-500 hover:text-white transition-all cursor-pointer text-left"
+            >
+              <div>
+                <p className="text-blue-400 font-semibold text-[11px]">Dr. Ahmed Bilal</p>
+                <p className="text-[10px] text-slate-500">dr.ahmed.bilal@superior.edu.pk</p>
+              </div>
+              <span className="text-[10px] text-slate-400 bg-[#1e293b] px-2 py-0.5 rounded">Fill</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("sarah.khan@superior.edu.pk");
+                setPassword("Password123!");
+                setError(null);
+              }}
+              className="w-full flex items-center justify-between rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-3 py-2 text-xs font-mono text-slate-300 hover:border-blue-500 hover:text-white transition-all cursor-pointer text-left"
+            >
+              <div>
+                <p className="text-blue-400 font-semibold text-[11px]">Dr. Sarah Khan</p>
+                <p className="text-[10px] text-slate-500">sarah.khan@superior.edu.pk</p>
+              </div>
+              <span className="text-[10px] text-slate-400 bg-[#1e293b] px-2 py-0.5 rounded">Fill</span>
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="text-center pt-2 border-t border-[#1f293d]">
         <Link
           href="/"
