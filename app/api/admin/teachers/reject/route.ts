@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dataAdapter } from "@/lib/sheets/adapter";
+import { getAdminSessionFromCookies } from "@/lib/auth/session";
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (session.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Super Administrator access required to reject faculty proposals" }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => ({}));
     const selectedSlugs: string[] | undefined = body.slugs;
 

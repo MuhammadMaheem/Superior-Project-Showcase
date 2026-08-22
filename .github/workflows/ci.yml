@@ -37,6 +37,9 @@ jobs:
       - name: Run QA Test Suite
         run: npx tsx scripts/test_suite.ts
 
+      - name: Run Security Penetration Test Suite
+        run: npx tsx scripts/security_penetration_test.ts
+
       - name: Build Next.js Application
         run: npm run build
         env:

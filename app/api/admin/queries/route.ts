@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dataAdapter } from "@/lib/sheets/adapter";
 import { sendEmail, generateQueryResolutionEmail } from "@/lib/email/mailer";
+import { getAdminSessionFromCookies } from "@/lib/auth/session";
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
 
@@ -30,6 +36,15 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (!session.permissions.can_manage_queries) {
+      return NextResponse.json({ error: "Forbidden: You do not have permission to manage helpdesk queries" }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !body.id) {
       return NextResponse.json({ error: "Query ID is required" }, { status: 400 });
@@ -51,7 +66,7 @@ export async function POST(request: NextRequest) {
         queryType: updated.related_project_id ? "Project Record Inquiry" : "Academic Support Query",
         originalMessage: updated.message,
         resolutionNote: admin_response || custom_message || "Your query has been reviewed and resolved.",
-        adminName: admin_name || "Superior University Directorate",
+        adminName: admin_name || session.name || "Superior University Directorate",
       });
 
       emailResult = await sendEmail({
@@ -66,7 +81,7 @@ export async function POST(request: NextRequest) {
       "QUERY_RESPONDED",
       "QUERY",
       id,
-      `Query from "${updated.name}" marked as ${status}${send_email ? " (Reply dispatched via Email)" : ""}`
+      `Query from "${updated.name}" marked as ${status}${send_email ? " (Reply dispatched via Email)" : ""} by ${session.name}`
     );
 
     return NextResponse.json({ success: true, query: updated, emailResult });

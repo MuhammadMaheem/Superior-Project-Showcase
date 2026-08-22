@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dataAdapter } from "@/lib/sheets/adapter";
+import { getAdminSessionFromCookies } from "@/lib/auth/session";
 
 // PATCH bulk update project statuses (published | hidden)
 export async function PATCH(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (!session.permissions.can_edit_projects) {
+      return NextResponse.json({ error: "Forbidden: You do not have permission to modify project visibility" }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !Array.isArray(body.ids) || body.ids.length === 0 || !body.status) {
       return NextResponse.json(
@@ -33,7 +43,7 @@ export async function PATCH(request: NextRequest) {
       "PROJECT_STATUS_TOGGLED",
       "PROJECT",
       "BULK_OPERATION",
-      `Bulk updated ${updatedCount} capstones to status: ${status}`
+      `Bulk updated ${updatedCount} capstones to status: ${status} by ${session.name}`
     );
 
     return NextResponse.json({

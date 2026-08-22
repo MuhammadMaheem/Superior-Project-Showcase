@@ -1,11 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendEmail, generateStudentInquiryEmail } from "@/lib/email/mailer";
 import { dataAdapter } from "@/lib/sheets/adapter";
+import { getAdminSessionFromCookies } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (!session.permissions.can_send_inquiries) {
+      return NextResponse.json({ error: "Forbidden: You do not have permission to dispatch student inquiries" }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       studentEmail,

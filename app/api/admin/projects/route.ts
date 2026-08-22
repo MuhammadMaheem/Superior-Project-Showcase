@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dataAdapter } from "@/lib/sheets/adapter";
-import type { Project } from "@/lib/sheets/models";
+import { getAdminSessionFromCookies } from "@/lib/auth/session";
 
 // GET all projects (including hidden ones)
 export async function GET() {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
     const projects = await dataAdapter.getProjects({ publishedOnly: false });
     return NextResponse.json({ projects });
   } catch (error) {
@@ -16,6 +21,15 @@ export async function GET() {
 // PUT update project fields
 export async function PUT(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (!session.permissions.can_edit_projects) {
+      return NextResponse.json({ error: "Forbidden: You do not have permission to edit projects" }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !body.id) {
       return NextResponse.json({ error: "Project ID is required" }, { status: 400 });
@@ -32,7 +46,7 @@ export async function PUT(request: NextRequest) {
       "PROJECT_EDITED",
       "PROJECT",
       id,
-      `Project "${updated.project_title}" updated by admin`
+      `Project "${updated.project_title}" updated by ${session.name} (${session.role})`
     );
 
     return NextResponse.json({ success: true, project: updated });
@@ -45,6 +59,15 @@ export async function PUT(request: NextRequest) {
 // PATCH toggle project status (published / hidden)
 export async function PATCH(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (!session.permissions.can_edit_projects) {
+      return NextResponse.json({ error: "Forbidden: You do not have permission to change project visibility" }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !body.id || !body.status) {
       return NextResponse.json({ error: "Project ID and status ('published' | 'hidden') are required" }, { status: 400 });
@@ -64,7 +87,7 @@ export async function PATCH(request: NextRequest) {
       "PROJECT_STATUS_TOGGLED",
       "PROJECT",
       id,
-      `Project "${updated.project_title}" status changed to ${status}`
+      `Project "${updated.project_title}" status changed to ${status} by ${session.name}`
     );
 
     return NextResponse.json({ success: true, project: updated });
@@ -77,6 +100,15 @@ export async function PATCH(request: NextRequest) {
 // DELETE project
 export async function DELETE(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (!session.permissions.can_delete_projects) {
+      return NextResponse.json({ error: "Forbidden: You do not have permission to delete projects" }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
@@ -95,7 +127,7 @@ export async function DELETE(request: NextRequest) {
       "PROJECT_DELETED",
       "PROJECT",
       id,
-      `Project "${existing?.project_title || id}" was permanently removed`
+      `Project "${existing?.project_title || id}" was permanently removed by ${session.name}`
     );
 
     return NextResponse.json({ success: true, message: "Project deleted" });

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "npx tsx scripts/test_suite.ts && npx tsx scripts/security_penetration_test.ts"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",

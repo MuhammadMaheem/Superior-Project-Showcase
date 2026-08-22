@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dataAdapter } from "@/lib/sheets/adapter";
+import { getAdminSessionFromCookies } from "@/lib/auth/session";
 
 // GET pending teachers, sync logs, and metadata
 export async function GET() {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
     const [pending, logs, meta, live] = await Promise.all([
       dataAdapter.getTeachersPending(),
       dataAdapter.getSyncLogs(),
@@ -26,6 +32,15 @@ export async function GET() {
 // PUT inline edit of a pending teacher before approval
 export async function PUT(request: NextRequest) {
   try {
+    const session = await getAdminSessionFromCookies();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized: Administrator session required" }, { status: 401 });
+    }
+
+    if (session.role !== "SUPER_ADMIN") {
+      return NextResponse.json({ error: "Forbidden: Super Administrator access required" }, { status: 403 });
+    }
+
     const body = await request.json().catch(() => null);
     if (!body || !body.slug) {
       return NextResponse.json({ error: "Teacher slug is required" }, { status: 400 });
@@ -42,7 +57,7 @@ export async function PUT(request: NextRequest) {
       "TEACHER_PENDING_EDITED",
       "TEACHER_PENDING",
       slug,
-      `Pending teacher "${updated.name}" was modified inline prior to approval`
+      `Pending teacher "${updated.name}" was modified inline by ${session.name}`
     );
 
     return NextResponse.json({ success: true, teacher: updated });
