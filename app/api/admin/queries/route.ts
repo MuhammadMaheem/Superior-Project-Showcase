@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dataAdapter } from "@/lib/sheets/adapter";
+import { sendEmail, generateQueryResolutionEmail } from "@/lib/email/mailer";
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,21 +35,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Query ID is required" }, { status: 400 });
     }
 
-    const { id, admin_response, status = "resolved" } = body;
-    const updated = await dataAdapter.respondToQuery(id, admin_response || "", status);
+    const { id, admin_response, status = "resolved", send_email = false, custom_subject, custom_message, admin_name } = body;
+    const updated = await dataAdapter.respondToQuery(id, admin_response || custom_message || "", status);
 
     if (!updated) {
       return NextResponse.json({ error: "Query not found" }, { status: 404 });
+    }
+
+    let emailResult = null;
+    if (send_email && updated.email) {
+      const emailDraft = generateQueryResolutionEmail({
+        queryId: updated.id,
+        studentName: updated.name,
+        studentEmail: updated.email,
+        queryType: updated.related_project_id ? "Project Record Inquiry" : "Academic Support Query",
+        originalMessage: updated.message,
+        resolutionNote: admin_response || custom_message || "Your query has been reviewed and resolved.",
+        adminName: admin_name || "Superior University Directorate",
+      });
+
+      emailResult = await sendEmail({
+        to: updated.email,
+        subject: custom_subject || emailDraft.subject,
+        html: emailDraft.html,
+        text: custom_message || emailDraft.text,
+      });
     }
 
     await dataAdapter.logAdminAction(
       "QUERY_RESPONDED",
       "QUERY",
       id,
-      `Query from "${updated.name}" marked as ${status}`
+      `Query from "${updated.name}" marked as ${status}${send_email ? " (Reply dispatched via Email)" : ""}`
     );
 
-    return NextResponse.json({ success: true, query: updated });
+    return NextResponse.json({ success: true, query: updated, emailResult });
   } catch (error) {
     console.error("[AdminQueries POST] Error:", error);
     return NextResponse.json({ error: "Failed to respond to query" }, { status: 500 });

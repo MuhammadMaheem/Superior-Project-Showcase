@@ -10,11 +10,13 @@ import {
   X,
   ArrowRight,
   Loader2,
+  Play,
 } from "lucide-react";
 import { GithubIcon } from "@/components/Icons";
 import { FacultyCombobox } from "@/components/FacultyCombobox";
 import { SectionSelector } from "@/components/SectionSelector";
 import { parseSuperiorRollNumber } from "@/lib/utils/roll-number";
+import { normalizeVideoEmbedUrl } from "@/lib/sheets/models";
 import confetti from "canvas-confetti";
 import type { Teacher, Project } from "@/lib/sheets/models";
 
@@ -521,7 +523,7 @@ export function ProjectSubmissionForm({ teachers, subjects }: ProjectSubmissionF
             />
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <label className="flex items-center justify-between text-xs font-mono font-medium text-slate-300">
               <span>Demo Video / Drive Link (Optional)</span>
               <span className="text-[10px] text-blue-400 font-normal">Drive / YouTube / Loom</span>
@@ -533,6 +535,31 @@ export function ProjectSubmissionForm({ teachers, subjects }: ProjectSubmissionF
               placeholder="https://drive.google.com/file/d/... or YouTube link"
               className="w-full rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-3.5 py-2.5 text-xs text-white focus:border-blue-500 focus:outline-none"
             />
+
+            {/* Live Inline Video Player Preview */}
+            {videoUrl && normalizeVideoEmbedUrl(videoUrl) && (
+              <div className="mt-3 rounded-2xl border border-blue-500/30 bg-blue-500/5 p-3.5 space-y-2.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono font-semibold text-blue-400 flex items-center gap-1.5">
+                    <Play className="h-3.5 w-3.5 fill-blue-400" />
+                    <span>Live Video Player Preview</span>
+                  </span>
+                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    ✓ Embed Ready
+                  </span>
+                </div>
+
+                <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black border border-slate-800 shadow-md">
+                  <iframe
+                    src={normalizeVideoEmbedUrl(videoUrl)}
+                    title="Live Demo Preview"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                    className="absolute inset-0 h-full w-full border-0"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">

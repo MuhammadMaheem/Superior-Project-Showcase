@@ -42,7 +42,83 @@ export function AdminQueriesInbox({ initialQueries }: AdminQueriesInboxProps) {
 
   const activeQuery = queries.find((q) => q.id === selectedQueryId) || null;
 
-  const handleSendResponse = async (id: string, markResolved = true) => {
+  // ✉️ Draft & Review Email Modal State
+  const [draftModalQuery, setDraftModalQuery] = useState<EnrichedQuery | null>(null);
+  const [draftSubject, setDraftSubject] = useState("");
+  const [draftMessage, setDraftMessage] = useState("");
+  const [draftRefCode, setDraftRefCode] = useState("");
+  const [isDispatching, setIsDispatching] = useState(false);
+  const [draftStatus, setDraftStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleOpenEmailDraft = (query: EnrichedQuery) => {
+    const year = new Date().getFullYear();
+    const cleanId = (query.id || "QRY").toUpperCase().replace(/[^A-Z0-9]/g, "-").slice(-8);
+    const ref = `SPS-QRY-${year}-${cleanId}`;
+    const category = query.related_project_id ? "Project Record Inquiry" : "Academic Support Query";
+
+    setDraftRefCode(ref);
+    setDraftSubject(`[${ref}] Resolution: Academic Showcase Support Query (${category})`);
+    setDraftMessage(
+      responseText.trim() ||
+        `Dear ${query.name},\n\nYour support query regarding "${category}" has been reviewed by the Capstone Directorate. The requested updates have been processed in the showcase registry.\n\nPlease feel free to verify your project on the showcase platform.`
+    );
+    setDraftStatus(null);
+    setDraftModalQuery(query);
+  };
+
+  const handleDispatchEmailReply = async () => {
+    if (!draftModalQuery) return;
+    setIsDispatching(true);
+    setDraftStatus(null);
+
+    try {
+      const res = await fetch("/api/admin/queries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: draftModalQuery.id,
+          admin_response: draftMessage.trim(),
+          status: "resolved",
+          send_email: true,
+          custom_subject: draftSubject.trim(),
+          custom_message: draftMessage.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setQueries((prev) =>
+          prev.map((q) =>
+            q.id === draftModalQuery.id
+              ? { ...q, admin_response: draftMessage.trim(), status: "resolved" }
+              : q
+          )
+        );
+        setDraftStatus({
+          type: "success",
+          text: `✓ Reply dispatched via Gmail to ${draftModalQuery.email}. Ticket resolved.`,
+        });
+        setTimeout(() => {
+          setDraftModalQuery(null);
+          setResponseText("");
+        }, 1800);
+      } else {
+        setDraftStatus({
+          type: "error",
+          text: data.error || "Failed to dispatch email reply.",
+        });
+      }
+    } catch {
+      setDraftStatus({
+        type: "error",
+        text: "Network error occurred while dispatching email reply.",
+      });
+    } finally {
+      setIsDispatching(false);
+    }
+  };
+
+  const handleSendResponse = async (id: string, markResolved = true, sendEmailFlag = false) => {
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/admin/queries", {
@@ -52,10 +128,10 @@ export function AdminQueriesInbox({ initialQueries }: AdminQueriesInboxProps) {
           id,
           admin_response: responseText.trim(),
           status: markResolved ? "resolved" : "open",
+          send_email: sendEmailFlag,
         }),
       });
 
-      const data = await res.json();
       if (res.ok) {
         setQueries((prev) =>
           prev.map((q) =>
@@ -258,21 +334,27 @@ export function AdminQueriesInbox({ initialQueries }: AdminQueriesInboxProps) {
                   className="w-full rounded-xl border border-[#1f293d] bg-[#0a0f1d] p-3 text-xs text-white focus:border-blue-500 focus:outline-none"
                 />
 
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[11px] text-slate-500">
-                    Saves reply and marks query as resolved
-                  </span>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
                   <button
-                    onClick={() => handleSendResponse(activeQuery.id, true)}
+                    onClick={() => handleSendResponse(activeQuery.id, true, false)}
                     disabled={isSubmitting}
-                    className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-500 disabled:opacity-50 transition-all"
+                    className="flex items-center gap-2 rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:border-slate-600 disabled:opacity-50 transition-all cursor-pointer"
                   >
                     {isSubmitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Check className="h-4 w-4" />
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
                     )}
-                    <span>Mark as Resolved</span>
+                    <span>Save Internal Note & Resolve</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleOpenEmailDraft(activeQuery)}
+                    disabled={!activeQuery.email}
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-xs font-semibold text-white shadow-md shadow-blue-500/25 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    <Mail className="h-4 w-4" />
+                    <span>✉️ Draft & Review Email Reply</span>
                   </button>
                 </div>
               </div>
@@ -284,6 +366,130 @@ export function AdminQueriesInbox({ initialQueries }: AdminQueriesInboxProps) {
           )}
         </div>
       </div>
+
+      {/* ✉️ Interactive Email Draft & Review Modal */}
+      {draftModalQuery && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl rounded-3xl border border-blue-500/30 bg-[#111827] p-6 sm:p-8 shadow-2xl space-y-5 text-white max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-[#1f293d] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                  <Mail className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="font-display text-base font-bold">
+                    Official Helpdesk Email Reply Draft
+                  </h3>
+                  <p className="text-xs font-mono text-slate-400">
+                    Review and customize before dispatching to student
+                  </p>
+                </div>
+              </div>
+
+              <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-mono font-bold text-blue-400 border border-blue-500/20">
+                {draftRefCode}
+              </span>
+            </div>
+
+            {/* Recipient & Subject */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono text-slate-400">Student Recipient</label>
+                <div className="rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-3 py-2 text-xs font-mono text-slate-200">
+                  {draftModalQuery.name} ({draftModalQuery.email})
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-mono text-slate-400">Inquiry Category</label>
+                <div className="rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-3 py-2 text-xs font-mono text-slate-200">
+                  {draftModalQuery.related_project_id ? "Project Record Inquiry" : "Academic Support Query"}
+                </div>
+              </div>
+            </div>
+
+            {/* Subject Line */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-slate-300">Email Subject Line</label>
+              <input
+                type="text"
+                value={draftSubject}
+                onChange={(e) => setDraftSubject(e.target.value)}
+                className="w-full rounded-xl border border-[#1f293d] bg-[#0a0f1d] px-3.5 py-2.5 text-xs sm:text-sm font-mono text-white focus:border-blue-500 focus:outline-none"
+              />
+            </div>
+
+            {/* Original Student Query Quote */}
+            <div className="rounded-xl border border-[#1f293d] bg-[#0a0f1d]/60 p-3.5 space-y-1 text-xs">
+              <span className="text-[10px] font-mono text-slate-500 uppercase">
+                Student&apos;s Submitted Message:
+              </span>
+              <p className="text-slate-300 italic whitespace-pre-line text-xs">
+                &ldquo;{draftModalQuery.message}&rdquo;
+              </p>
+            </div>
+
+            {/* Resolution Note / Message Body */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-slate-300">
+                Official Resolution Remarks & Instructions
+              </label>
+              <textarea
+                rows={4}
+                value={draftMessage}
+                onChange={(e) => setDraftMessage(e.target.value)}
+                placeholder="Explain the resolution or next steps taken for the student..."
+                className="w-full rounded-xl border border-[#1f293d] bg-[#0a0f1d] p-3 text-xs sm:text-sm text-white focus:border-blue-500 focus:outline-none font-sans"
+              />
+            </div>
+
+            {/* Status Message */}
+            {draftStatus && (
+              <div
+                className={`rounded-xl p-3 text-xs font-mono ${
+                  draftStatus.type === "success"
+                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                    : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                }`}
+              >
+                {draftStatus.text}
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#1f293d]">
+              <button
+                type="button"
+                onClick={() => setDraftModalQuery(null)}
+                disabled={isDispatching}
+                className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDispatchEmailReply}
+                disabled={isDispatching || !draftMessage.trim()}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2.5 text-xs font-semibold text-white shadow-lg shadow-blue-500/25 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 transition-all cursor-pointer"
+              >
+                {isDispatching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Dispatching via Gmail...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4" />
+                    <span>Dispatch Reply via Gmail</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

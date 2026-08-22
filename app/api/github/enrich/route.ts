@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseAndValidateGitHubUrl } from "@/lib/security/ssrf";
 import { checkRateLimit, getClientIp } from "@/lib/auth/rate-limit";
 
+export interface LanguageStat {
+  language: string;
+  percentage: number;
+  color?: string;
+  bytes: number;
+}
+
 export interface GitHubEnrichResponse {
   success: boolean;
   owner: string;
@@ -12,11 +19,40 @@ export interface GitHubEnrichResponse {
   description?: string;
   tech_stack?: string;
   languages?: string[];
+  language_breakdown?: LanguageStat[];
+  stars?: number;
+  forks?: number;
+  open_issues?: number;
   topics?: string[];
   readme_excerpt?: string;
   last_commit_at?: string;
+  default_branch?: string;
   warning?: string;
 }
+
+// Common language color mappings for GitHub badges
+const LANGUAGE_COLORS: Record<string, string> = {
+  Python: "#3572A5",
+  JavaScript: "#f1e05a",
+  TypeScript: "#3178c6",
+  Java: "#b07219",
+  "C++": "#f34b7d",
+  C: "#555555",
+  "C#": "#178600",
+  PHP: "#4F5D95",
+  Ruby: "#701516",
+  Go: "#00ADD8",
+  Rust: "#dea584",
+  Dart: "#00B4AB",
+  Swift: "#F05138",
+  Kotlin: "#A97BFF",
+  HTML: "#e34c26",
+  CSS: "#563d7c",
+  Shell: "#89e051",
+  Vue: "#41b883",
+  Jupyter: "#DA5B0B",
+  R: "#198CE7",
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -91,11 +127,29 @@ export async function POST(request: NextRequest) {
 
     const repoData = await repoRes.value.json();
 
-    // Parse languages
+    // Parse languages & calculate percentage breakdown
     let languagesList: string[] = [];
+    const languageBreakdown: LanguageStat[] = [];
+
     if (langRes.status === "fulfilled" && langRes.value.ok) {
-      const langData = await langRes.value.json();
+      const langData: Record<string, number> = await langRes.value.json();
       languagesList = Object.keys(langData);
+      const totalBytes = Object.values(langData).reduce((a, b) => a + b, 0);
+
+      if (totalBytes > 0) {
+        for (const [lang, bytes] of Object.entries(langData)) {
+          const pct = Math.round((bytes / totalBytes) * 1000) / 10;
+          if (pct >= 1.0) {
+            languageBreakdown.push({
+              language: lang,
+              percentage: pct,
+              bytes,
+              color: LANGUAGE_COLORS[lang] || "#6366f1",
+            });
+          }
+        }
+        languageBreakdown.sort((a, b) => b.percentage - a.percentage);
+      }
     }
 
     // Parse owner profile
@@ -138,24 +192,21 @@ export async function POST(request: NextRequest) {
             .replace(/<[^>]+>/g, "")                    // html tags
             .replace(/```[\s\S]*?```/g, "")             // code blocks
             .replace(/`.*?`/g, "")                      // inline code
+            .replace(/^#+\s+.*$/gm, "")                 // header lines
+            .replace(/[-*+]\s+/g, "")                   // unordered list bullets
+            .replace(/^\d+\.\s+/gm, "")                 // ordered list bullets
+            .replace(/\n{2,}/g, "\n")                   // collapse multiple linebreaks
             .trim();
 
-          // Split into paragraphs and pick the first substantive text block
+          // Find first meaningful paragraph with >= 40 chars
           const paragraphs = cleanBody
-            .split(/\n\s*\n/)
-            .map((p) => p.replace(/^#+.*$/gm, "").trim())
-            .filter(
-              (p) =>
-                p.length > 30 &&
-                !p.startsWith("-") &&
-                !p.startsWith("*") &&
-                !p.toLowerCase().includes("table of contents")
-            );
+            .split("\n")
+            .map((p) => p.trim())
+            .filter((p) => p.length >= 40 && !p.toLowerCase().startsWith("http"));
 
           if (paragraphs.length > 0) {
-            const rawParagraph = paragraphs[0].replace(/\s+/g, " ");
-            readmeExcerpt =
-              rawParagraph.slice(0, 320) + (rawParagraph.length > 320 ? "..." : "");
+            readmeExcerpt = paragraphs[0].slice(0, 320).trim();
+            if (paragraphs[0].length > 320) readmeExcerpt += "...";
           }
         }
       } catch {
@@ -208,9 +259,14 @@ export async function POST(request: NextRequest) {
       description: finalDescription,
       tech_stack: techStackString,
       languages: languagesList,
+      language_breakdown: languageBreakdown,
+      stars: repoData.stargazers_count ?? 0,
+      forks: repoData.forks_count ?? 0,
+      open_issues: repoData.open_issues_count ?? 0,
       topics,
       readme_excerpt: readmeExcerpt,
       last_commit_at: repoData.pushed_at || repoData.updated_at,
+      default_branch: repoData.default_branch || "main",
     };
 
     return NextResponse.json(responseData);

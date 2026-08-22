@@ -16,10 +16,15 @@ import {
   Play,
   Layers,
   Film,
+  QrCode,
 } from "lucide-react";
 import { GithubIcon, LinkedinIcon } from "@/components/Icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { ImageSlideshow } from "./ImageSlideshow";
+import { ProjectQrModal } from "./ProjectQrModal";
+import { ImageLightbox } from "./ImageLightbox";
+import { GithubInsightsCard } from "./GithubInsightsCard";
+import type { LanguageStat } from "@/app/api/github/enrich/route";
 import type { Project } from "@/lib/sheets/models";
 import { normalizeVideoEmbedUrl } from "@/lib/sheets/models";
 import { formatDate } from "@/lib/utils";
@@ -32,13 +37,52 @@ interface ProjectModalProps {
 
 export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
   const [activeMediaTab, setActiveMediaTab] = useState<"screenshots" | "video">("screenshots");
+  const [isQrOpen, setIsQrOpen] = useState(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
-  // Reset tab when project changes
+  // GitHub Live Insights State
+  const [githubStats, setGithubStats] = useState<{
+    stars?: number;
+    forks?: number;
+    defaultBranch?: string;
+    lastCommitAt?: string;
+    languageBreakdown?: LanguageStat[];
+    owner?: string;
+    repo?: string;
+  } | null>(null);
+
+  // Reset tab & fetch repo stats when project changes
   useEffect(() => {
     if (project?.video_url && !project.screenshot_1 && !project.screenshot_2) {
       setActiveMediaTab("video");
     } else {
       setActiveMediaTab("screenshots");
+    }
+
+    if (project?.github_url) {
+      fetch("/api/github/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ github_url: project.github_url }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.success) {
+            setGithubStats({
+              stars: data.stars,
+              forks: data.forks,
+              defaultBranch: data.default_branch,
+              lastCommitAt: data.last_commit_at,
+              languageBreakdown: data.language_breakdown,
+              owner: data.owner,
+              repo: data.repo,
+            });
+          }
+        })
+        .catch(() => setGithubStats(null));
+    } else {
+      setGithubStats(null);
     }
   }, [project]);
 
@@ -182,9 +226,29 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
                   />
                 </div>
               ) : (
-                <ImageSlideshow images={screenshots} title={project.project_title} />
+                <ImageSlideshow
+                  images={screenshots}
+                  title={project.project_title}
+                  onOpenLightbox={(idx) => {
+                    setLightboxIndex(idx);
+                    setIsLightboxOpen(true);
+                  }}
+                />
               )}
             </div>
+
+            {/* GitHub Live Repository Insights Card */}
+            {githubStats && (
+              <GithubInsightsCard
+                owner={githubStats.owner || "superior-university"}
+                repo={githubStats.repo || "capstone"}
+                stars={githubStats.stars}
+                forks={githubStats.forks}
+                defaultBranch={githubStats.defaultBranch}
+                lastCommitAt={githubStats.lastCommitAt}
+                languageBreakdown={githubStats.languageBreakdown}
+              />
+            )}
 
             {/* 4. Description */}
             <div className="space-y-2 border-t border-[#1f293d] pt-5">
@@ -220,11 +284,20 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
                   <span>Launch Live Demo</span>
                 </a>
               )}
+              {/* Exhibition QR Code Placard */}
+              <button
+                type="button"
+                onClick={() => setIsQrOpen(true)}
+                className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white shadow-md shadow-purple-500/20 transition-all hover:from-purple-500 hover:to-indigo-500 cursor-pointer"
+              >
+                <QrCode className="h-4 w-4" />
+                <span>Exhibition Stall QR</span>
+              </button>
               {project.video_url && (
                 <button
                   type="button"
                   onClick={() => setActiveMediaTab("video")}
-                  className="flex items-center gap-2 rounded-xl bg-red-600/20 text-red-300 border border-red-500/30 px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all hover:bg-red-600/30 hover:text-white"
+                  className="flex items-center gap-2 rounded-xl bg-red-600/20 text-red-300 border border-red-500/30 px-4 py-2.5 text-xs sm:text-sm font-semibold transition-all hover:bg-red-600/30 hover:text-white cursor-pointer"
                 >
                   <Play className="h-4 w-4 fill-current" />
                   <span>Play Video Demo</span>
@@ -321,6 +394,22 @@ export function ProjectModal({ project, isOpen, onClose }: ProjectModalProps) {
               </div>
             </div>
           </motion.div>
+
+          {/* Exhibition Stall QR Code Placard Modal */}
+          <ProjectQrModal
+            project={project}
+            isOpen={isQrOpen}
+            onClose={() => setIsQrOpen(false)}
+          />
+
+          {/* Fullscreen High-Res Screenshot Lightbox */}
+          <ImageLightbox
+            images={screenshots}
+            currentIndex={lightboxIndex}
+            isOpen={isLightboxOpen}
+            onClose={() => setIsLightboxOpen(false)}
+            onNavigate={(idx) => setLightboxIndex(idx)}
+          />
         </div>
       )}
     </AnimatePresence>

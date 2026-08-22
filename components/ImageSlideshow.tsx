@@ -2,16 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Play, Pause, ImageIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Play, Pause, ImageIcon, Maximize2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface ImageSlideshowProps {
   images: string[];
   title: string;
+  onOpenLightbox?: (index: number) => void;
 }
 
-export function ImageSlideshow({ images, title }: ImageSlideshowProps) {
+export function ImageSlideshow({ images, title, onOpenLightbox }: ImageSlideshowProps) {
   // Filter out empty entries
   const validImages = images.filter((img) => img && typeof img === "string" && img.trim().length > 0);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -47,6 +48,19 @@ export function ImageSlideshow({ images, title }: ImageSlideshowProps) {
     <div className="relative w-full space-y-3">
       {/* Main Slideshow Viewport */}
       <div className="group relative aspect-video w-full overflow-hidden rounded-2xl border border-[#1f293d] bg-black shadow-2xl">
+        {/* Fullscreen Zoom Lightbox Trigger */}
+        {onOpenLightbox && (
+          <button
+            type="button"
+            onClick={() => onOpenLightbox(currentIndex)}
+            className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-full bg-black/70 px-3 py-1.5 text-xs font-mono font-medium text-white backdrop-blur-md border border-white/10 hover:bg-blue-600 transition-all opacity-0 group-hover:opacity-100 cursor-pointer shadow-lg"
+            title="Open Fullscreen Lightbox"
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+            <span>Zoom</span>
+          </button>
+        )}
+
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -54,7 +68,8 @@ export function ImageSlideshow({ images, title }: ImageSlideshowProps) {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.02 }}
             transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="relative h-full w-full"
+            onClick={() => onOpenLightbox && onOpenLightbox(currentIndex)}
+            className={`relative h-full w-full ${onOpenLightbox ? "cursor-zoom-in" : ""}`}
           >
             {/* Display Base64 Data URI or Remote Image */}
             {validImages[currentIndex].startsWith("data:") ? (

@@ -44,7 +44,7 @@ function getTransporter() {
 /**
  * Generates an official SPS reference code for email tracking and filtering
  */
-export function generateReferenceCode(type: "INQ" | "ESC" | "CRED", identifier?: string): string {
+export function generateReferenceCode(type: "INQ" | "ESC" | "CRED" | "QRY", identifier?: string): string {
   const year = new Date().getFullYear();
   const cleanId = (identifier || "FAC")
     .toUpperCase()
@@ -553,4 +553,124 @@ export function generateTeacherCredentialsEmail(params: {
   `.trim();
 
   return { subject, html, refCode };
+}
+
+export interface QueryResolutionEmailParams {
+  queryId: string;
+  studentName: string;
+  studentEmail: string;
+  queryType: string;
+  originalMessage: string;
+  resolutionNote: string;
+  adminName?: string;
+  projectTitle?: string;
+}
+
+/**
+ * Generates an official SPS ticket resolution response email
+ */
+export function generateQueryResolutionEmail(params: QueryResolutionEmailParams): {
+  subject: string;
+  html: string;
+  text: string;
+  refCode: string;
+} {
+  const refCode = generateReferenceCode("QRY", params.queryId);
+  const subject = `[${refCode}] Resolution: Academic Showcase Support Query (${params.queryType})`;
+
+  const text = `
+SUPERIOR UNIVERSITY — PROJECT SHOWCASE HELPDESK
+Reference: ${refCode}
+Status: Resolved
+
+Dear ${params.studentName},
+
+Your academic showcase support query regarding "${params.queryType}" has been reviewed and resolved by the Capstone Administration Team.
+
+---
+Official Resolution Remarks:
+${params.resolutionNote}
+---
+
+Original Query:
+${params.originalMessage}
+
+If you have any further questions or require additional adjustments, please visit the Project Showcase Helpdesk at https://superior-showcase.edu.pk/help.
+
+Regards,
+${params.adminName || "Capstone Directorate Administrator"}
+Faculty of Computer Science & Information Technology
+Superior University, Lahore
+  `.trim();
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${subject}</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #0a0f1d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #e2e8f0; }
+    .container { max-width: 600px; margin: 30px auto; background: #111827; border: 1px solid #1f293d; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); }
+    .header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 32px 24px; text-align: center; border-bottom: 2px solid #60a5fa; }
+    .content { padding: 32px 24px; }
+    .card { background: #0f172a; border: 1px solid #1e293b; border-left: 4px solid #10b981; border-radius: 8px; padding: 18px; margin: 20px 0; }
+    .orig-card { background: #0b1120; border: 1px solid #1e293b; border-radius: 8px; padding: 14px; margin: 16px 0; font-size: 13px; color: #94a3b8; }
+    .footer { padding: 20px; text-align: center; font-size: 11px; color: #64748b; font-family: monospace; border-top: 1px solid #1f293d; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 9999px; font-size: 11px; font-family: monospace; font-weight: 700; background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div style="font-size: 11px; font-family: monospace; font-weight: 700; color: #bfdbfe; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px;">Superior University · Academic Helpdesk</div>
+      <h1 style="margin: 0; font-size: 22px; font-weight: 800; color: #ffffff;">Query Resolution Notice</h1>
+      <div style="margin-top: 10px;">
+        <span class="badge">✓ Ticket Resolved</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <p style="font-size: 15px; color: #cbd5e1; line-height: 1.6; margin-top: 0;">
+        Dear <strong>${params.studentName}</strong>,
+      </p>
+
+      <p style="font-size: 14px; color: #94a3b8; line-height: 1.6;">
+        Your inquiry regarding <strong>${params.queryType}</strong> ${params.projectTitle ? `for capstone <em>"${params.projectTitle}"</em>` : ""} has been reviewed and resolved by our academic administrative team.
+      </p>
+
+      <div class="card">
+        <div style="font-size: 11px; font-family: monospace; color: #34d399; font-weight: 700; text-transform: uppercase; margin-bottom: 8px;">
+          Official Resolution Remarks
+        </div>
+        <div style="font-size: 14px; color: #f8fafc; line-height: 1.6; white-space: pre-line;">
+          ${params.resolutionNote}
+        </div>
+      </div>
+
+      <div class="orig-card">
+        <div style="font-size: 10px; font-family: monospace; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 6px;">
+          Original Query Summary
+        </div>
+        <div style="line-height: 1.5;">
+          ${params.originalMessage}
+        </div>
+      </div>
+
+      <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #1f293d; font-size: 12px; color: #94a3b8;">
+        <div style="font-weight: 700; color: #ffffff;">${params.adminName || "Capstone Directorate Administrator"}</div>
+        <div>Department of Computer Science & Information Technology · Superior University</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p style="margin: 0 0 4px 0;">© ${new Date().getFullYear()} Superior University Showcase Directorate.</p>
+      <p style="margin: 0;">Tracking Reference: <code>${refCode}</code> · Automatically recorded in audit logs.</p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  return { subject, html, text, refCode };
 }

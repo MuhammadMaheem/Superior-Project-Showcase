@@ -6,7 +6,7 @@ import { normalizeVideoEmbedUrl, ProjectSubmissionSchema, type Project } from ".
 import { parseSuperiorRollNumber } from "../lib/utils/roll-number";
 import { normalizeRepoUrl, evaluateProjectSimilarity } from "../lib/similarity/detector";
 import { hashPassword, verifyPassword } from "../lib/auth/accounts";
-import { generateReferenceCode } from "../lib/email/mailer";
+import { generateReferenceCode, generateQueryResolutionEmail } from "../lib/email/mailer";
 
 console.log("=================================================");
 console.log("  SUPERIOR PROJECT SHOWCASE - QA TEST SUITE      ");
@@ -180,6 +180,25 @@ assert(!verifyPassword("WrongPassword123", testHash), "Reject incorrect password
 
 const credRefCode = generateReferenceCode("CRED", "DR-AHMED");
 assert(credRefCode.startsWith("SPS-CRED-") && credRefCode.includes("2026"), "Generate valid credentials email reference code");
+
+// 9. Helpdesk Query Email & Reference Code Generator
+console.log("\n[9/9] Testing Helpdesk Query Resolution Email Generator...");
+
+const qryRefCode = generateReferenceCode("QRY", "QRY-98124");
+assert(qryRefCode.startsWith("SPS-QRY-") && qryRefCode.includes("2026"), "Generate valid helpdesk QRY tracking code");
+
+const qryDraft = generateQueryResolutionEmail({
+  queryId: "qry-test-42",
+  studentName: "Ali Raza",
+  studentEmail: "ali.raza@superior.edu.pk",
+  queryType: "Request Project Edit",
+  originalMessage: "Please update my github repo URL to the final branch.",
+  resolutionNote: "Updated repository link in database.",
+  adminName: "Dr. Ahmed Bilal",
+});
+assert(qryDraft.subject.includes("SPS-QRY-") && qryDraft.subject.includes("Resolution"), "Draft subject contains SPS-QRY reference");
+assert(qryDraft.text.includes("Updated repository link in database"), "Draft text contains resolution notes");
+assert(qryDraft.html.includes("Ticket Resolved"), "Draft HTML contains professional resolution badge");
 
 // Print Summary
 console.log("\n=================================================");

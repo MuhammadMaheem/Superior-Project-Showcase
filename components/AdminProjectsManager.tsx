@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   GraduationCap,
   GitCompare,
+  Download,
 } from "lucide-react";
 import { GithubIcon } from "@/components/Icons";
 import { FacultyCombobox } from "@/components/FacultyCombobox";
@@ -114,6 +115,86 @@ export function AdminProjectsManager({
   const [escalateNotes, setEscalateNotes] = useState("");
   const [isEscalating, setIsEscalating] = useState(false);
   const [escalateStatus, setEscalateStatus] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Bulk Actions State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+
+  const handleBulkStatus = async (status: "published" | "hidden") => {
+    if (selectedIds.size === 0) return;
+    setIsBulkUpdating(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const res = await fetch("/api/admin/projects/bulk", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids, status }),
+      });
+      if (res.ok) {
+        setProjects((prev) =>
+          prev.map((p) => (selectedIds.has(p.id) ? { ...p, status } : p))
+        );
+        setSelectedIds(new Set());
+      }
+    } catch (err) {
+      console.error("Bulk update failed:", err);
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
+
+  const handleBulkExportCsv = () => {
+    const selectedProjects = projects.filter((p) => selectedIds.has(p.id));
+    if (selectedProjects.length === 0) return;
+
+    const headers = [
+      "Project ID",
+      "Project Title",
+      "Student Name",
+      "Roll Number",
+      "Batch Section",
+      "Supervising Faculty",
+      "Subject",
+      "Status",
+      "Similarity Flag",
+      "Similarity Score (%)",
+      "GitHub URL",
+      "Live Demo URL",
+    ];
+
+    const escapeCsv = (val: string | number | undefined) => {
+      if (val === undefined || val === null) return '""';
+      const str = String(val).replace(/"/g, '""');
+      return `"${str}"`;
+    };
+
+    const rows = selectedProjects.map((p) => {
+      const sim = similarityMap.get(p.id);
+      return [
+        escapeCsv(p.id),
+        escapeCsv(p.project_title),
+        escapeCsv(p.student_name),
+        escapeCsv(p.roll_number),
+        escapeCsv(p.batch_section),
+        escapeCsv(p.supervisor_name),
+        escapeCsv(p.subject),
+        escapeCsv(p.status),
+        escapeCsv(sim?.flag || "original"),
+        escapeCsv(sim?.score || 0),
+        escapeCsv(p.github_url),
+        escapeCsv(p.live_url),
+      ].join(",");
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `SPS-Faculty-Export-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Filtered List
   const filtered = projects.filter((p) => {
@@ -439,6 +520,21 @@ export function AdminProjectsManager({
           <table className="w-full text-left text-xs">
             <thead className="border-b border-[#1f293d] bg-[#0a0f1d]/50 text-slate-400 font-mono uppercase text-[10px]">
               <tr>
+                <th className="py-3.5 px-4 w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible projects"
+                    checked={filtered.length > 0 && filtered.every((p) => selectedIds.has(p.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(new Set(filtered.map((p) => p.id)));
+                      } else {
+                        setSelectedIds(new Set());
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-[#1f293d] bg-[#0a0f1d] text-blue-600 focus:ring-blue-500 cursor-pointer"
+                  />
+                </th>
                 <th className="py-3.5 px-4">Project</th>
                 <th className="py-3.5 px-4">Student</th>
                 <th className="py-3.5 px-4">Roll No</th>
@@ -452,7 +548,7 @@ export function AdminProjectsManager({
             <tbody className="divide-y divide-[#1f293d]/60 text-slate-300">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500 font-mono">
+                  <td colSpan={9} className="py-8 text-center text-slate-500 font-mono">
                     No matching project records found.
                   </td>
                 </tr>
@@ -461,7 +557,31 @@ export function AdminProjectsManager({
                   const sim = similarityMap.get(p.id);
 
                   return (
-                    <tr key={p.id} className="hover:bg-[#1a2333]/50 transition-colors">
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-[#1a2333]/50 transition-colors ${
+                        selectedIds.has(p.id) ? "bg-blue-600/10" : ""
+                      }`}
+                    >
+                      {/* Selection Checkbox */}
+                      <td className="py-3.5 px-4 w-10">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${p.project_title}`}
+                          checked={selectedIds.has(p.id)}
+                          onChange={(e) => {
+                            const next = new Set(selectedIds);
+                            if (e.target.checked) {
+                              next.add(p.id);
+                            } else {
+                              next.delete(p.id);
+                            }
+                            setSelectedIds(next);
+                          }}
+                          className="h-4 w-4 rounded border-[#1f293d] bg-[#0a0f1d] text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                      </td>
+
                       {/* Project Title & Link */}
                       <td className="py-3.5 px-4 max-w-xs">
                         <div className="space-y-0.5">
@@ -518,28 +638,28 @@ export function AdminProjectsManager({
                       <td className="py-3.5 px-4">
                         {sim && sim.flag === "duplicate" ? (
                           <button
-                            onClick={() => (sim.matchedProject ? handleOpenCompare(p, sim) : handleOpenInquire(p, sim))}
-                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/40 hover:bg-red-500/30 transition-all cursor-pointer animate-pulse"
-                            title="Click to inspect side-by-side comparison with archive project"
+                            type="button"
+                            onClick={() => handleOpenCompare(p, sim)}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 px-2.5 py-0.5 text-[11px] font-mono font-bold text-rose-400 border border-rose-500/30 hover:bg-rose-500/30 transition-all cursor-pointer"
+                            title="Click for Side-by-Side Comparison"
                           >
-                            <ShieldAlert className="h-3 w-3" />
-                            <span>Duplicate URL</span>
-                            <GitCompare className="h-2.5 w-2.5 opacity-70 ml-0.5" />
+                            <ShieldAlert className="h-3 w-3 shrink-0" />
+                            <span>{sim.score}% Matched</span>
                           </button>
                         ) : sim && sim.flag === "warning" ? (
                           <button
-                            onClick={() => (sim.matchedProject ? handleOpenCompare(p, sim) : handleOpenInquire(p, sim))}
-                            className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-all cursor-pointer"
-                            title="Click to inspect side-by-side comparison with archive project"
+                            type="button"
+                            onClick={() => handleOpenCompare(p, sim)}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[11px] font-mono font-bold text-amber-400 border border-amber-500/30 hover:bg-amber-500/30 transition-all cursor-pointer"
+                            title="Click for Side-by-Side Comparison"
                           >
-                            <AlertTriangle className="h-3 w-3" />
-                            <span>{sim.score}% Similar</span>
-                            <GitCompare className="h-2.5 w-2.5 opacity-70 ml-0.5" />
+                            <AlertTriangle className="h-3 w-3 shrink-0" />
+                            <span>{sim.score}% Similarity</span>
                           </button>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-emerald-400 border border-emerald-500/20">
                             <ShieldCheck className="h-3 w-3" />
-                            <span>100% Unique</span>
+                            <span>Original</span>
                           </span>
                         )}
                       </td>
@@ -547,46 +667,52 @@ export function AdminProjectsManager({
                       {/* Supervisor & Subject */}
                       <td className="py-3.5 px-4">
                         <div className="space-y-0.5">
-                          <p className="text-emerald-400 font-medium">{p.supervisor_name}</p>
-                          <p className="text-[10px] text-slate-400">{p.subject}</p>
+                          <p className="font-medium text-slate-200">{p.supervisor_name}</p>
+                          <p className="text-[11px] text-purple-400 font-mono">{p.subject}</p>
                         </div>
                       </td>
 
-                      {/* Batch / Section */}
-                      <td className="py-3.5 px-4 font-mono text-slate-400">{p.batch_section}</td>
+                      {/* Section */}
+                      <td className="py-3.5 px-4 font-mono text-blue-400 font-semibold">{p.batch_section}</td>
 
-                      {/* Status Badge */}
+                      {/* Status Toggle */}
                       <td className="py-3.5 px-4">
                         {canEdit ? (
                           <button
                             onClick={() => handleToggleStatus(p)}
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold transition-all hover:scale-105 ${
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase transition-all ${
                               p.status === "published"
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20"
-                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20"
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30"
+                                : "bg-slate-700/50 text-slate-400 border border-slate-600 hover:bg-slate-700"
                             }`}
                           >
                             {p.status === "published" ? (
                               <>
-                                <Eye className="h-3 w-3" />
-                                <span>Published</span>
+                                <Eye className="h-3 w-3" /> Published
                               </>
                             ) : (
                               <>
-                                <EyeOff className="h-3 w-3" />
-                                <span>Hidden</span>
+                                <EyeOff className="h-3 w-3" /> Hidden
                               </>
                             )}
                           </button>
                         ) : (
                           <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-semibold ${
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase ${
                               p.status === "published"
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                : "bg-slate-700/50 text-slate-400 border border-slate-600"
                             }`}
                           >
-                            {p.status === "published" ? "Published" : "Hidden"}
+                            {p.status === "published" ? (
+                              <>
+                                <Eye className="h-3 w-3" /> Published
+                              </>
+                            ) : (
+                              <>
+                                <EyeOff className="h-3 w-3" /> Hidden
+                              </>
+                            )}
                           </span>
                         )}
                       </td>
@@ -598,7 +724,7 @@ export function AdminProjectsManager({
                           {sim?.matchedProject && (
                             <button
                               onClick={() => handleOpenCompare(p, sim)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-purple-400 hover:bg-purple-600 hover:text-white transition-colors"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-purple-400 hover:bg-purple-600 hover:text-white transition-colors cursor-pointer"
                               title="Side-by-Side Codebase & Abstract Comparison"
                             >
                               <GitCompare className="h-3.5 w-3.5" />
@@ -609,7 +735,7 @@ export function AdminProjectsManager({
                           {canInquire && (
                             <button
                               onClick={() => handleOpenInquire(p, sim)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-blue-400 hover:bg-blue-600 hover:text-white transition-colors"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-blue-400 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer"
                               title="Send Plagiarism / Inquiry Notice (Gmail)"
                             >
                               <Mail className="h-3.5 w-3.5" />
@@ -620,7 +746,7 @@ export function AdminProjectsManager({
                           {canEscalate && (
                             <button
                               onClick={() => handleOpenEscalate(p, sim)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-amber-400 hover:bg-amber-600 hover:text-white transition-colors"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-amber-400 hover:bg-amber-600 hover:text-white transition-colors cursor-pointer"
                               title="Escalate Dossier to Faculty Supervisor"
                             >
                               <ShieldAlert className="h-3.5 w-3.5" />
@@ -631,7 +757,7 @@ export function AdminProjectsManager({
                           {canEdit && (
                             <button
                               onClick={() => setEditingProject(p)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-slate-300 hover:bg-blue-600 hover:text-white transition-colors"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-slate-300 hover:bg-blue-600 hover:text-white transition-colors cursor-pointer"
                               title="Edit Project"
                             >
                               <Edit2 className="h-3.5 w-3.5" />
@@ -642,7 +768,7 @@ export function AdminProjectsManager({
                           {canDelete && (
                             <button
                               onClick={() => setDeletingProjectId(p.id)}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-rose-400 hover:bg-rose-600 hover:text-white transition-colors"
+                              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#1e293b] text-rose-400 hover:bg-rose-600 hover:text-white transition-colors cursor-pointer"
                               title="Delete Project"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -658,6 +784,60 @@ export function AdminProjectsManager({
           </table>
         </div>
       </div>
+
+      {/* Floating Sticky Bulk Actions Bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-wrap items-center gap-3 rounded-2xl border border-blue-500/40 bg-[#0d1424]/95 px-5 py-3.5 shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 duration-200">
+          <div className="flex items-center gap-2 border-r border-[#1f293d] pr-3 text-xs font-mono">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-[11px]">
+              {selectedIds.size}
+            </span>
+            <span className="text-slate-300 font-semibold">Selected</span>
+          </div>
+
+          {/* Bulk Publish */}
+          {canEdit && (
+            <button
+              onClick={() => handleBulkStatus("published")}
+              disabled={isBulkUpdating}
+              className="flex items-center gap-1.5 rounded-xl bg-emerald-600/20 px-3 py-1.5 text-xs font-semibold text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isBulkUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+              <span>Bulk Publish</span>
+            </button>
+          )}
+
+          {/* Bulk Hide */}
+          {canEdit && (
+            <button
+              onClick={() => handleBulkStatus("hidden")}
+              disabled={isBulkUpdating}
+              className="flex items-center gap-1.5 rounded-xl bg-amber-600/20 px-3 py-1.5 text-xs font-semibold text-amber-400 border border-amber-500/30 hover:bg-amber-600/30 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isBulkUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <EyeOff className="h-3.5 w-3.5" />}
+              <span>Bulk Hide</span>
+            </button>
+          )}
+
+          {/* Bulk Export CSV */}
+          <button
+            onClick={handleBulkExportCsv}
+            className="flex items-center gap-1.5 rounded-xl bg-[#1e293b] px-3 py-1.5 text-xs font-semibold text-slate-200 border border-slate-700 hover:bg-slate-700 transition-all cursor-pointer"
+          >
+            <Download className="h-3.5 w-3.5 text-blue-400" />
+            <span>Export CSV</span>
+          </button>
+
+          {/* Deselect All */}
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="flex items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-mono text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span>Clear</span>
+          </button>
+        </div>
+      )}
 
       {/* 0. Side-by-Side Originality Comparison Modal */}
       {compareDetail && (
