@@ -32,8 +32,41 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       {/* Subtle Top-Right Ambient Glow */}
       <div className="absolute -right-16 -top-16 h-36 w-36 rounded-full bg-blue-500/10 blur-3xl transition-opacity group-hover:opacity-100 opacity-30 pointer-events-none" />
 
-      <div className="space-y-4">
-        {/* Screenshot Image Preview (Uniform 16:10 aspect ratio for all cards) */}
+      <div className="space-y-3.5">
+        {/* Student Author Header Row */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {project.student_avatar_url ? (
+              <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-blue-500/30 ring-2 ring-blue-500/10">
+                <Image
+                  src={project.student_avatar_url}
+                  alt={project.student_name}
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              </div>
+            ) : (
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-xs font-bold shadow-md shadow-blue-500/25">
+                {project.student_name.charAt(0)}
+              </div>
+            )}
+            <div className="min-w-0">
+              <h4 className="text-xs font-semibold text-white truncate group-hover:text-blue-400 transition-colors">
+                {project.student_name}
+              </h4>
+              <p className="text-[10px] font-mono text-slate-400 truncate">
+                {project.roll_number || "Student"}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1e293b] text-slate-400 transition-all group-hover:bg-blue-600 group-hover:text-white group-hover:rotate-45 shadow-sm">
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </div>
+        </div>
+
+        {/* Screenshot Image Preview (Uniform 16:10 aspect ratio) */}
         <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl border border-[#1f293d] bg-[#0a0f1d] shadow-inner">
           {firstScreenshot ? (
             firstScreenshot.startsWith("data:") ? (
@@ -73,44 +106,22 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           </div>
         </div>
 
-        {/* Student Row */}
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {project.student_avatar_url ? (
-              <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded-full border border-blue-500/30 ring-2 ring-blue-500/10">
-                <Image
-                  src={project.student_avatar_url}
-                  alt={project.student_name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
-              </div>
-            ) : (
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600/20 text-blue-400 text-xs font-bold border border-blue-500/30">
-                {project.student_name.charAt(0)}
-              </div>
-            )}
-            <div className="min-w-0">
-              <h4 className="text-xs font-semibold text-white truncate group-hover:text-blue-400 transition-colors">
-                {project.student_name}
-              </h4>
-              <p className="text-[10px] font-mono text-slate-400 truncate">
-                {project.roll_number || "Student"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1e293b] text-slate-400 transition-all group-hover:bg-blue-600 group-hover:text-white group-hover:rotate-45">
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </div>
-        </div>
-
         {/* Title & Description */}
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 pt-0.5">
           <h3 className="font-display text-base font-bold text-white tracking-tight leading-snug line-clamp-2 transition-colors group-hover:text-blue-300">
             {project.project_title}
           </h3>
+
+          {/* Supervisor & Subject Meta Row */}
+          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+            <span className="text-emerald-400 font-medium truncate max-w-[170px]" title={project.supervisor_name}>
+              {project.supervisor_name}
+            </span>
+            <span className="text-slate-600">•</span>
+            <span className="text-purple-300 truncate" title={project.subject}>
+              {project.subject}
+            </span>
+          </div>
 
           <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
             {project.description}
